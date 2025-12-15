@@ -29,9 +29,10 @@ func (w *Worker) AddTask(t task.Task) {
 }
 
 func (w *Worker) RunTask() docker.Result {
+	op := "worker.RunTask: "
 	t := w.Queue.Dequeue()
 	if t == nil {
-		log.Println("No tasks in the queue")
+		log.Println(op + "No tasks in the queue")
 		return docker.Result{Error: nil}
 	}
 
@@ -51,10 +52,10 @@ func (w *Worker) RunTask() docker.Result {
 			case task.Completed:
 				result = w.StopTask(taskQueued)
 			default:
-				result.Error = errors.New("unreachable")
+				result.Error = errors.New(op + "unreachable")
 		}
 	} else {
-		err := fmt.Errorf("Invalid transition from %v to %v", taskPersisted.State, taskQueued.State)
+		err := fmt.Errorf(op + "Invalid transition from %v to %v", taskPersisted.State, taskQueued.State)
 		result.Error = err
 	}
 
@@ -62,6 +63,7 @@ func (w *Worker) RunTask() docker.Result {
 }
 
 func (w *Worker) StartTask(t task.Task) docker.Result {
+	op := "worker.StartTask: "
 	t.StartTime = time.Now().UTC()
 
 	config := task.NewConfig(&t)
@@ -69,7 +71,7 @@ func (w *Worker) StartTask(t task.Task) docker.Result {
 
 	result := d.Run()
 	if result.Error != nil {
-		log.Printf("Error running task %v: %v\n", t.UUID, result.Error)
+		log.Printf(op + "Error running task %v: %v\n", t.UUID, result.Error)
 		task.StateFailed(t)
 	} else {
 		t.ContainerID = result.ContainerID
@@ -82,18 +84,19 @@ func (w *Worker) StartTask(t task.Task) docker.Result {
 }
 
 func (w *Worker) StopTask(t task.Task) docker.Result {
+	op := "worker.StopTask: "
 	config := task.NewConfig(&t)
 	d := docker.NewDocker(config)
 
 	result := d.Stop(t.ContainerID)
 	if result.Error != nil {
-		log.Printf("Error stopping container %v: %v\n", t.ContainerID, result.Error)
+		log.Printf(op + "Error stopping container %v: %v\n", t.ContainerID, result.Error)
 	}
 
 	task.StateCompleted(t)
 	w.Db[t.UUID] = &t
 
-	log.Printf("Stopped and removerd container %v for task %v\n", t.ContainerID, t.UUID)
+	log.Printf(op + "Stopped and removerd container %v for task %v\n", t.ContainerID, t.UUID)
 
 	return result
 }
