@@ -26,17 +26,22 @@ type Result struct {
 	Result      string
 }
 
-func NewDocker(c task.Config) Docker {
-	return Docker {
+func NewDocker(c task.Config) *Docker {
+	dc, _ := client.NewClientWithOpts(client.FromEnv)
+
+	return &Docker {
+		Client: dc,
 		Config: c,
 	}
 }
 
 func (d *Docker) Run() Result {
+	op := "docker.Run: "
+
 	ctx := context.Background()
 	reader, err := d.Client.ImagePull(ctx, d.Config.Image, image.PullOptions{})
 	if err != nil {
-		log.Printf("Failed to pull image: %v", err)
+		log.Printf(op + "Failed to pull image: %v", err)
 		return Result{Error: err}
 	}
 	io.Copy(os.Stdout, reader)
@@ -65,12 +70,12 @@ func (d *Docker) Run() Result {
 
 	resp, err := d.Client.ContainerCreate(ctx, &cc, &hc, nil, nil, d.Config.Name)
 	if err != nil {
-		log.Printf("Error creating container using image %s: %v\n", d.Config.Image, err)
+		log.Printf(op + "Error creating container using image %s: %v\n", d.Config.Image, err)
 		return Result{Error: err}
 	}
 
 	if err = d.Client.ContainerStart(ctx, resp.ID, container.StartOptions{}); err != nil {
-		log.Printf("Error starting container %s: %v\n", resp.ID, err)
+		log.Printf(op + "Error starting container %s: %v\n", resp.ID, err)
 		return Result{Error: err}
 	}
 	
@@ -80,7 +85,7 @@ func (d *Docker) Run() Result {
 		container.LogsOptions{ShowStdout: true, ShowStderr: true},
 	)
 	if err != nil {
-		log.Printf("Error getting logs for container %s: %v\n", resp.ID, err)
+		log.Printf(op + "Error getting logs for container %s: %v\n", resp.ID, err)
 		return Result{Error: err}
 	}
 
@@ -90,11 +95,13 @@ func (d *Docker) Run() Result {
 }
 
 func (d *Docker) Stop(id string) Result {
-	log.Printf("Attempting to stop container %v", id )
+	op := "docker.Stop: "
+
+	log.Printf(op + "Attempting to stop container %v", id )
 
 	if err := d.Client.ContainerStop(context.Background(), id, container.StopOptions{});
 		err != nil {
-			log.Printf("Error stopping container %s: %v\n", id, err)
+			log.Printf(op + "Error stopping container %s: %v\n", id, err)
 			return Result{Error: err}
 	}
 
@@ -105,7 +112,7 @@ func (d *Docker) Stop(id string) Result {
 	})
 
 	if err != nil {
-		log.Printf("Error removing container %s: %v\n", id, err)
+		log.Printf(op + "Error removing container %s: %v\n", id, err)
 		return Result{Error: err}
 	}
 
