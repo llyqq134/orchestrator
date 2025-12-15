@@ -17,7 +17,7 @@ type Config struct {
 	RestartPolicy string
 }
 
-func NewConfig(t Task) Config {
+func NewConfig(t *Task) Config {
 	return Config {
 		Name: t.Name,
 		ExposedPorts: t.ExposedPorts,
