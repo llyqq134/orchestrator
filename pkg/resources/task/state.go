@@ -1,12 +1,17 @@
 package task
 
-// type State represents 4 states of task
+import (
+	"time"
+)
+
+// type State represents 5 states of task
 type State int
 
 /*
-Task can have 4 state:
+Task can have 5 state:
 
 	pending
+	Scheduled
 	running
 	completed
 	failed
@@ -23,3 +28,44 @@ const (
 	// if a task fails it moves to this state
 	Failed
 )
+
+func StatePending(task Task) {
+	setState(&task, Pending)
+}
+
+func StateScheduled(task Task) {
+	setState(&task, Scheduled) 
+}
+
+func StateRunning(task Task) {
+	setState(&task, Running)
+}
+
+func StateCompleted(task Task) {
+	setState(&task, Completed)
+
+	// enter logic
+	task.FinishTime = time.Now().UTC()
+}
+
+func StateFailed(task Task) {
+	switch task.State {
+	case Pending:
+	case Scheduled:
+	}
+
+	setState(&task, Failed)
+}
+
+func setState(task *Task, newValue State) {
+	// exit logic
+	switch task.State {
+	case Pending:
+	case Scheduled:
+	case Running:
+	case Completed:
+	case Failed:
+	}
+
+	task.State = newValue
+}
