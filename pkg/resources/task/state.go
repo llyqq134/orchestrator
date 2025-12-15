@@ -1,6 +1,7 @@
 package task
 
 import (
+	"slices"
 	"time"
 )
 
@@ -28,6 +29,18 @@ const (
 	// if a task fails it moves to this state
 	Failed
 )
+
+var stateTransitionMap = map[State][]State {
+	Pending: []State{Scheduled},
+	Scheduled: []State{Scheduled, Running, Failed},
+	Running: []State{Running, Completed, Failed},
+	Completed: []State{},
+	Failed: []State{},
+}
+
+func ValidateTransition(from, to State) bool {
+	return slices.Contains(stateTransitionMap[from], to)
+}
 
 func StatePending(task Task) {
 	setState(&task, Pending)
