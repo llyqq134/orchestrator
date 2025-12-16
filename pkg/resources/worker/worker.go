@@ -34,6 +34,16 @@ func (w *Worker) GetTasks() []*task.Task{
 	return tasks
 }
 
+func (w *Worker) GetTaskByUUID(value uuid.UUID) *task.Task {
+	for _, t := range w.Db {
+		if t.UUID == value {
+			return t
+		}
+	}
+
+	return nil
+}
+
 func (w *Worker) AddTask(t task.Task) {
 	w.Queue.Enqueue(t)
 }
