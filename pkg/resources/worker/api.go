@@ -31,7 +31,9 @@ func (a *Api) Register () {
 
 func (a *Api) StartTaskHandler(c *gin.Context) {
 	te := task.Event{}
+	te.UUID = uuid.New()
 
+	te.Task.UUID = te.UUID
 	if err := c.BindJSON(&te); err != nil {
 		log.Printf("Error binding a task: %v\n", err.Error())
 		c.JSON(400, gin.H {
@@ -47,6 +49,7 @@ func (a *Api) StartTaskHandler(c *gin.Context) {
 
 	c.JSON(201, gin.H {
 		"message": "Task was created",
+		"id": te.UUID,
 	})
 }
 
