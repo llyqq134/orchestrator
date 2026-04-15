@@ -8,6 +8,7 @@ import (
 
 	"orchestrator/pkg/docker"
 	"orchestrator/pkg/resources/task"
+	"orchestrator/pkg/metrics"
 
 	"github.com/golang-collections/collections/queue"
 	"github.com/google/uuid"
@@ -18,10 +19,21 @@ type Worker struct {
 	Queue     queue.Queue
 	Db        map[uuid.UUID]*task.Task
 	TaskCount int
+	Stats *metrics.Stats
 }
 
 func (w *Worker) GetStats() {
 	fmt.Println("collecting stats")
+}
+
+
+func (w *Worker) CollectStats() {
+	for {
+		log.Println("Collecting stats")
+		w.Stats = w.GetStats()
+		w.Stats.TaskCount = w.TaskCount
+		time.Sleep(10 * time.Second)
+	}
 }
 
 func (w *Worker) GetTasks() []*task.Task{
