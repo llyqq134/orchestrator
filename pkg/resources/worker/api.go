@@ -16,17 +16,33 @@ type Api struct {
 }
 
 const (
-	startTaskURL = 		"/start" 									// POST
-	getAllTasksURL = 	"/tasks" 									// GET
-	getTaskByIdURL = 	"/tasks/:UUID" 						// GET
-	deleteTaskURL = 	"/tasks/delete/:UUID" 		// DELETE
+	mainTaskUrl = "/tasks"
+
+	startTaskURL = 		"/start" 					// POST
+	getAllTasksURL = 	"/" 							// GET
+	getTaskByIdURL = 	"/:UUID" 					// GET
+	deleteTaskURL = 	"/delete/:UUID" 	// DELETE
+)
+
+const (
+	mainStatUrl = "/stats"
+
+	statsURL = "/" 											// GET
 )
 
 func (a *Api) Register () {
-	a.Router.POST(startTaskURL, a.StartTaskHandler)
-	a.Router.GET(getAllTasksURL, a.GetAllTasksHandler)
-	a.Router.GET(getTaskByIdURL, a.GetTaskByIdHandler)
-	a.Router.DELETE(deleteTaskURL, a.StopTaskHandler)
+	tasks := a.Router.Group(mainTaskUrl)
+	{
+		tasks.POST(startTaskURL, a.StartTaskHandler)
+		tasks.GET(getAllTasksURL, a.GetAllTasksHandler)
+		tasks.GET(getTaskByIdURL, a.GetTaskByIdHandler)
+		tasks.DELETE(deleteTaskURL, a.StopTaskHandler)
+	}
+
+	stats := a.Router.Group(mainStatUrl)
+	{
+		stats.GET(statsURL, a.GetStatsHandler)
+	}
 }
 
 func (a *Api) StartTaskHandler(c *gin.Context) {
@@ -133,4 +149,8 @@ func (a *Api) StopTaskHandler(c *gin.Context) {
 	c.JSON(204, gin.H {
 		"message": "task was deleted",
 	})
+}
+
+func (a *Api) GetStatsHandler(c *gin.Context) {
+	c.JSON(200, a.Worker.Stats)
 }
