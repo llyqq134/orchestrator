@@ -15,10 +15,21 @@ type Manager struct {
 	Workers       []string
 	WorkerTaskMap map[string][]uuid.UUID
 	TaskWorkerMap map[uuid.UUID]string
+	LastWorker int 
 }
 
-func (m *Manager) SelectWorker() {
-	fmt.Println("Select worker")
+func (m *Manager) SelectWorker() string {
+	var newWorker int 
+
+	if m.LastWorker < len(m.Workers) {
+		m.LastWorker++
+		newWorker = m.LastWorker
+	} else {
+		newWorker = 0
+		m.LastWorker = 0
+	}
+
+	return m.Workers[newWorker]
 }
 
 func (m *Manager) UpdateTasks() {
