@@ -1,7 +1,9 @@
 package manager
 
 import (
+	"encoding/json"
 	"fmt"
+	"log"
 	"orchestrator/pkg/resources/task"
 
 	"github.com/golang-collections/collections/queue"
@@ -10,8 +12,8 @@ import (
 
 type Manager struct {
 	Pending       queue.Queue
-	TaskDb        map[uuid.UUID][]*task.Task
-	EventDb       map[uuid.UUID][]*task.Event
+	TaskDb        map[uuid.UUID]*task.Task
+	EventDb       map[uuid.UUID]*task.Event
 	Workers       []string
 	WorkerTaskMap map[string][]uuid.UUID
 	TaskWorkerMap map[uuid.UUID]string
@@ -37,5 +39,26 @@ func (m *Manager) UpdateTasks() {
 }
 
 func (m *Manager) SendWork() {
-	fmt.Println("Send work")
+	if m.Pending.Len() > 0 {
+		chosenWorker := m.SelectWorker()
+		
+		e := m.Pending.Dequeue()
+		taskEvent := e.(task.Event)
+		t := taskEvent.Task
+
+		log.Printf("Pulled %v off pending queue\n", t)
+
+		m.EventDb[t.UUID] = &taskEvent
+		m.WorkerTaskMap[chosenWorker] = append(m.WorkerTaskMap[chosenWorker], taskEvent.Task.UUID)
+		m.TaskWorkerMap[t.UUID] = chosenWorker
+
+		t.State = task.Scheduled
+		m.TaskDb[t.UUID] = &t 
+
+		data, err := json.Marshal(taskEvent)
+		if err != nil {
+			log.Printf("unable to marshal task object: %v\n", t)
+		}
+	}
 }
+
