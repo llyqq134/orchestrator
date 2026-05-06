@@ -93,3 +93,40 @@ func (m *Manager) SendWork() {
 	}
 }
 
+func (m *Manager)UpdateTask() {
+	for _, worker := range m.Workers {
+		log.Printf("Checking worker %v for the task update\n", worker)
+		url := fmt.Sprintf("http://%s/tasks", worker)
+
+		resp, err := http.Get(url) 
+		if err != nil {
+			log.Printf("Error connecting to worker %v: %v\n", worker, err)
+		}	
+
+		if resp.StatusCode != http.StatusOK {
+			log.Prtintf("Error sengind request: %v\n", err)
+		}
+
+		d := json.NewDecoder(resp.Body)
+		var tasks []*task.Task
+
+		if err := d.Decode(&tasks); err != nil {
+			log.Printf("Error unmarshalling tasks: %s\n", err.Error())
+		}
+
+		for _, t := range tasks {
+			log.Printf("Attemting to update the task: %v\n", t.UUID)
+			
+			_, ok := m.TaskDb[t.UUID]
+			if !ok {
+				log.Prtintf("Task with UUID %v not found", t.UUID)
+				return 
+			}
+
+			if m.TaskDb[t.UUID].State != t.State {
+
+			}
+		}
+	}
+}
+
