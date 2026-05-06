@@ -104,7 +104,7 @@ func (m *Manager)UpdateTask() {
 		}	
 
 		if resp.StatusCode != http.StatusOK {
-			log.Prtintf("Error sengind request: %v\n", err)
+			log.Printf("Error sengind request: %v\n", err)
 		}
 
 		d := json.NewDecoder(resp.Body)
@@ -119,13 +119,17 @@ func (m *Manager)UpdateTask() {
 			
 			_, ok := m.TaskDb[t.UUID]
 			if !ok {
-				log.Prtintf("Task with UUID %v not found", t.UUID)
+				log.Printf("Task with UUID %v not found", t.UUID)
 				return 
 			}
 
 			if m.TaskDb[t.UUID].State != t.State {
-
+				m.TaskDb[t.UUID].State = t.State 
 			}
+
+			m.TaskDb[t.UUID].StartTime = t.StartTime
+			m.TaskDb[t.UUID].FinishTime = t.FinishTime
+			m.TaskDb[t.UUID].ContainerID = t.ContainerID
 		}
 	}
 }
