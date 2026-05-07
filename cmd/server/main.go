@@ -6,6 +6,7 @@ import (
 	"orchestrator/config"
 	"orchestrator/pkg/resources/task"
 	"orchestrator/pkg/resources/worker"
+	"orchestrator/pkg/resources/manager"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -34,8 +35,48 @@ func main() {
 	api.Register()
 
 	go RunTasks(&w)
-	router.Use()
-	router.Run(fmt.Sprintf("%v:%v", cfg.Host, cfg.Port)	)
+	go w.CollectStats()
+
+	go func() {
+		router.Use()
+  	router.Run(fmt.Sprintf("%v:%v", cfg.Host, cfg.Port))
+	}()
+
+	workers := []string{fmt.Sprintf("%v:%v", cfg.Host, cfg.Port)}
+	m := manager.New(workers)
+
+	for i := range 3 {
+		t := task.Task {
+			UUID: uuid.New(),
+			Name: fmt.Sprintf("test-container-%d", i),
+			State: task.Scheduled,
+			Image: "strm/helloworld-http",
+		}
+
+		te := task.Event {
+			UUID: uuid.New(),
+			State: task.Running,
+			Task: t,
+		}
+
+		m.AddTask(te)
+		m.SendWork()
+	}
+
+	go func() {
+		for {
+			fmt.Printf("[Manager] Updating task from %d workers\n", len(m.Workers))
+			m.UpdateTasks()
+			time.Sleep(15 * time.Second)
+		}
+	}()
+
+	for {
+		for _, t := range m.TaskDb {
+			fmt.Printf("[Manager] Task:\n\tUUID: %v\n\tState: %v\n", t.UUID, t.State)
+			time.Sleep(15 * time.Second)
+		}
+	}
 }
 
 func RunTasks(w *worker.Worker) {
