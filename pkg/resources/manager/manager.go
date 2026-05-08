@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"orchestrator/pkg/resources/task"
+	"time"
 
 	"github.com/golang-collections/collections/queue"
 	"github.com/google/uuid"
@@ -109,7 +110,7 @@ func (m *Manager) SendWork() {
 	}
 }
 
-func (m *Manager)UpdateTasks() {
+func (m *Manager)updateTasks() {
 	for _, worker := range m.Workers {
 		log.Printf("Checking worker %v for the task update\n", worker)
 		url := fmt.Sprintf("http://%s/tasks", worker)
@@ -150,6 +151,20 @@ func (m *Manager)UpdateTasks() {
 	}
 }
 
+func (m *Manager)UpdateTasks() {
+	for {
+		log.Println("Checking for task updates from workers")
+		
+		m.updateTasks()
+		log.Println("Task updates completed")
+
+		timeToSleep := 10
+		log.Printf("Sleeping for %v seconds", timeToSleep)
+
+		time.Sleep(time.Duration(timeToSleep) * time.Second)
+	}
+}
+
 func (m *Manager)AddTask(te task.Event) {
 	m.Pending.Enqueue(te)
 }
@@ -161,4 +176,16 @@ func (m *Manager)GetTasks() []*task.Task {
 	}
 
 	return tasks 
+}
+
+func (m *Manager) ProcessTasks() {
+	for {
+		log.Println("Processing any tasks in the queue")
+
+		m.SendWork()
+		timeToSleep := 10
+		log.Printf("Sleeping for %v seconds", timeToSleep)
+
+		time.Sleep(time.Duration(timeToSleep) * time.Second)
+	}
 }
