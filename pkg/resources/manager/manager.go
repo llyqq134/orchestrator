@@ -22,22 +22,38 @@ type Manager struct {
 	LastWorker int 
 }
 
+func New(workers []string) *Manager {
+	taskDB := make(map[uuid.UUID]*task.Task)
+	eventDB := make(map[uuid.UUID]*task.Event)
+	workerTaskMap := make(map[string][]uuid.UUID)
+	taskWorkerMap := make(map[uuid.UUID]string)
+
+	for worker := range workers {
+		workerTaskMap[workers[worker]] = []uuid.UUID{}
+	}
+
+	return &Manager{
+		Pending: *queue.New(),
+		TaskDb: taskDB,
+		EventDb: eventDB,
+		Workers: workers,
+	 	WorkerTaskMap: workerTaskMap,
+		TaskWorkerMap: taskWorkerMap,
+	}
+}
+
 func (m *Manager) SelectWorker() string {
 	var newWorker int 
 
-	if m.LastWorker < len(m.Workers) {
+	if m.LastWorker + 1 < len(m.Workers) {
+		newWorker = m.LastWorker + 1
 		m.LastWorker++
-		newWorker = m.LastWorker
 	} else {
 		newWorker = 0
 		m.LastWorker = 0
 	}
 
 	return m.Workers[newWorker]
-}
-
-func (m *Manager) UpdateTasks() {
-	fmt.Println("Update tasks")
 }
 
 func (m *Manager) SendWork() {
@@ -50,7 +66,7 @@ func (m *Manager) SendWork() {
 
 		log.Printf("Pulled %v off pending queue\n", t)
 
-		m.EventDb[t.UUID] = &taskEvent
+		m.EventDb[taskEvent.UUID] = &taskEvent
 		m.WorkerTaskMap[chosenWorker] = append(m.WorkerTaskMap[chosenWorker], taskEvent.Task.UUID)
 		m.TaskWorkerMap[t.UUID] = chosenWorker
 
@@ -62,7 +78,7 @@ func (m *Manager) SendWork() {
 			log.Printf("unable to marshal task object: %v\n", t)
 		}
 
-		url := fmt.Sprintf("http://%s/tasks", chosenWorker)
+		url := fmt.Sprintf("http://%s/tasks/start", chosenWorker)
 
 		resp, err := http.Post(url, "application/json", bytes.NewBuffer(data))
 		if err != nil {
@@ -93,7 +109,7 @@ func (m *Manager) SendWork() {
 	}
 }
 
-func (m *Manager)UpdateTask() {
+func (m *Manager)UpdateTasks() {
 	for _, worker := range m.Workers {
 		log.Printf("Checking worker %v for the task update\n", worker)
 		url := fmt.Sprintf("http://%s/tasks", worker)
@@ -134,3 +150,6 @@ func (m *Manager)UpdateTask() {
 	}
 }
 
+func (m *Manager)AddTask(te task.Event) {
+	m.Pending.Enqueue(te)
+}
