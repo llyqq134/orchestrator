@@ -70,7 +70,7 @@ func (m *Manager) SendWork() {
 		m.WorkerTaskMap[chosenWorker] = append(m.WorkerTaskMap[chosenWorker], taskEvent.Task.UUID)
 		m.TaskWorkerMap[t.UUID] = chosenWorker
 
-		t.State = task.Scheduled
+		task.StateScheduled(t)
 		m.TaskDb[t.UUID] = &t 
 
 		data, err := json.Marshal(taskEvent)
@@ -82,7 +82,7 @@ func (m *Manager) SendWork() {
 
 		resp, err := http.Post(url, "application/json", bytes.NewBuffer(data))
 		if err != nil {
-			fmt.Sprintf("Error connecting to %v: %v\n", chosenWorker, err)
+			fmt.Printf("Error connecting to %v: %v\n", chosenWorker, err)
 			m.Pending.Enqueue(taskEvent)
 
 			return
