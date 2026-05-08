@@ -18,10 +18,10 @@ type Api struct {
 const (
 	mainTaskUrl = "/tasks"
 
-	startTaskURL = 		"/start" 					// POST
+	startTaskURL = 		"/"			 					// POST
 	getAllTasksURL = 	"/" 							// GET
 	getTaskByIdURL = 	"/:UUID" 					// GET
-	deleteTaskURL = 	"/delete/:UUID" 	// DELETE
+	deleteTaskURL = 	"/:UUID"				 	// DELETE
 )
 
 const (
