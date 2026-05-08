@@ -45,7 +45,7 @@ func (w *Worker) AddTask(t task.Task) {
 	w.Queue.Enqueue(t)
 }
 
-func (w *Worker) RunTask() docker.Result {
+func (w *Worker) runTask() docker.Result {
 	op := "worker.RunTask: "
 	t := w.Queue.Dequeue()
 	if t == nil {
@@ -116,4 +116,20 @@ func (w *Worker) StopTask(t task.Task) docker.Result {
 	log.Printf(op + "Stopped and removerd container %v for task %v\n", t.ContainerID, t.UUID)
 
 	return result
+}
+
+func RunTasks() {
+	for {
+		if w.Queue.Len() != 0 {
+			result := w.runTask()
+			if result.Error != nil {
+				log.Printf("Error running task: %v\n", result.Error)
+			} 
+		} else {
+			log.Println("No tasks to process currently")
+		}
+
+		log.Println("waiting for 10 sec")
+		time.Sleep(time.Second * 10)
+	}
 }
