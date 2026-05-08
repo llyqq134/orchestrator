@@ -3,6 +3,7 @@ package manager
 import (
 	"fmt"
 	"log"
+	"time"
 	"orchestrator/pkg/resources/task"
 
 	"github.com/gin-gonic/gin"
@@ -12,8 +13,8 @@ import (
 const (
 	mainURL = "/tasks"
 
-	getTasksURL = "/"						//GET
-	createTaskURL = "/"					//POST 
+	getTasksURL = ""						//GET
+	createTaskURL = ""					//POST 
 	deleteTaskURL = "/:UUID"		//DELETE 
 )
 
@@ -42,7 +43,7 @@ func (a *Api)CreateTaskHandler(c *gin.Context) {
 
 	if err := c.ShouldBindJSON(&te); err != nil {
 		msg := fmt.Sprintf("Error unmarshalling body: %v", err)
-		log.Printf(msg)
+		log.Println(msg)
 
 		c.JSON(400, gin.H {
 			"statusCode": 400,
@@ -81,5 +82,28 @@ func (a *Api)DeleteTaskHandler(c *gin.Context) {
 		return
 	}
 
+	taskToDelete, ok := a.Manager.TaskDb[taskUUID]
+	if !ok {
+		log.Printf("No task with UUID: %v\n", taskUUID)
+		c.JSON(404, gin.H {
+			"statusCode": 404,
+			"Message": "No task with this UUID",
+		})
+	}
+
+	te := task.Event {
+		UUID: uuid.New(),
+		State: task.Completed,
+		Timestamp: time.Now(),
+	}
+
+	taskCopy := *taskToDelete
+	task.StateCompleted(taskCopy)
+	te.Task = taskCopy
+	a.Manager.AddTask(te)
+
+	log.Printf("Added task event %v to delete task %v\n", te.UUID, taskToDelete.UUID)
+
+	c.JSON(204, gin.H{})
 }
 
