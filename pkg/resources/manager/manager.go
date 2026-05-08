@@ -153,3 +153,12 @@ func (m *Manager)UpdateTasks() {
 func (m *Manager)AddTask(te task.Event) {
 	m.Pending.Enqueue(te)
 }
+
+func (m *Manager)GetTasks() []*task.Task {
+	tasks := []*task.Task{} 
+	for _, t := range m.TaskDb {
+		tasks = append(tasks, t)
+	}
+
+	return tasks 
+}
