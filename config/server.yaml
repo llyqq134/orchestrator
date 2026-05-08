@@ -1,2 +1,6 @@
-HOST: localhost
-PORT: 5555
+worker:
+  HOST: localhost
+  PORT: 5555
+manager:
+  HOST: localhost 
+  PORT: 5556
