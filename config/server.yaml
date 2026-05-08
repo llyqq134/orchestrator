@@ -1,6 +1,6 @@
 worker:
-  HOST: localhost
-  PORT: 5555
+  host: localhost
+  port: 5555
 manager:
-  HOST: localhost 
-  PORT: 5556
+  host: localhost 
+  port: 5556
