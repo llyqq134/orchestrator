@@ -18,8 +18,8 @@ type Api struct {
 const (
 	mainTaskUrl = "/tasks"
 
-	startTaskURL = 		"/"			 					// POST
-	getAllTasksURL = 	"/" 							// GET
+	startTaskURL = 		""			 					// POST
+	getAllTasksURL = 	""	 							// GET
 	getTaskByIdURL = 	"/:UUID" 					// GET
 	deleteTaskURL = 	"/:UUID"				 	// DELETE
 )
@@ -27,7 +27,7 @@ const (
 const (
 	mainStatUrl = "/stats"
 
-	statsURL = "/" 											// GET
+	statsURL = "" 											// GET
 )
 
 func (a *Api) Register () {
