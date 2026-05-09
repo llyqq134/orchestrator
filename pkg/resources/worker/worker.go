@@ -23,11 +23,13 @@ type Worker struct {
 }
 
 func (w *Worker) CollectStats() {
+	op := "[worker.CollectStats]: "
 	for {
-		log.Println("Collecting stats")
+		log.Printf(op + "Collecting stats\n")
 		w.Stats = metrics.GetStats()
 		w.Stats.TaskCount = w.TaskCount
-		time.Sleep(10 * time.Second)
+		timeToSleep := 10
+		time.Sleep(time.Duration(timeToSleep) * time.Second)
 	}
 }
 
@@ -46,7 +48,7 @@ func (w *Worker) AddTask(t task.Task) {
 }
 
 func (w *Worker) runTask() docker.Result {
-	op := "worker.RunTask: "
+	op := "[worker.RunTask]: "
 	t := w.Queue.Dequeue()
 	if t == nil {
 		log.Println(op + "No tasks in the queue")
@@ -72,7 +74,7 @@ func (w *Worker) runTask() docker.Result {
 			result.Error = errors.New(op + "unreachable")
 		}
 	} else {
-		err := fmt.Errorf(op+"Invalid transition from %v to %v", taskPersisted.State, taskQueued.State)
+		err := fmt.Errorf(op + "Invalid transition from %v to %v", taskPersisted.State, taskQueued.State)
 		result.Error = err
 	}
 
@@ -80,7 +82,7 @@ func (w *Worker) runTask() docker.Result {
 }
 
 func (w *Worker) StartTask(t task.Task) docker.Result {
-	op := "worker.StartTask: "
+	op := "[worker.StartTask]: "
 	t.StartTime = time.Now().UTC()
 
 	config := task.NewConfig(&t)
@@ -88,7 +90,7 @@ func (w *Worker) StartTask(t task.Task) docker.Result {
 
 	result := d.Run()
 	if result.Error != nil {
-		log.Printf(op+"Error running task %v: %v\n", t.UUID, result.Error)
+		log.Printf(op + "Error running task %v: %v\n", t.UUID, result.Error)
 		task.StateFailed(&t)
 	} else {
 		t.ContainerID = result.ContainerID
@@ -101,20 +103,20 @@ func (w *Worker) StartTask(t task.Task) docker.Result {
 }
 
 func (w *Worker) StopTask(t task.Task) docker.Result {
-	op := "worker.StopTask: "
+	op := "[worker.StopTask]: "
 	config := task.NewConfig(&t)
 	d := docker.NewDocker(config)
 
 	result := d.Stop(t.ContainerID)
 	if result.Error != nil {
-		log.Printf(op+"Error stopping container %v: %v\n", t.ContainerID, result.Error)
+		log.Printf(op + "Error stopping container %v: %v\n", t.ContainerID, result.Error)
 	}
 
 	t.FinishTime = time.Now().UTC()
 	task.StateCompleted(&t)
 	w.Db[t.UUID] = &t
 
-	log.Printf(op+"Stopped and removerd container %v for task %v\n", t.ContainerID, t.UUID)
+	log.Printf(op + "Stopped and removerd container %v for task %v\n", t.ContainerID, t.UUID)
 
 	return result
 }
@@ -124,13 +126,13 @@ func (w *Worker) RunTasks() {
 		if w.Queue.Len() != 0 {
 			result := w.runTask()
 			if result.Error != nil {
-				log.Printf("Error running task: %v\n", result.Error)
+				log.Printf(op + "Error running task: %v\n", result.Error)
 			}
 		} else {
-			log.Println("No tasks to process currently")
+			log.Println(op + "No tasks to process currently")
 		}
 
-		log.Println("waiting for 10 sec")
+		log.Println(op + "waiting for 10 sec")
 		time.Sleep(time.Second * 10)
 	}
 }
@@ -139,4 +141,17 @@ func (w *Worker) InspectTask(t task.Task) docker.DockerInspectResponse {
 	d := docker.NewDocker(task.NewConfig(&t))
 
 	return d.Inspect(t.ContainerID)
+}
+
+func (w *Worker) UpdateTasks() {
+	op := "[worker.UpdateTasks]: "
+	for {
+		log.Println(op + "Checking status of tasks")
+		w.updateTasks()
+		log.Println(op + "Task updates complete")
+		
+		timeToSleep := 10
+		log.Printf(op + "Sleeping for %v seconds\n", timeToSleep)
+		time.Sleep(time.Duration(timeToSleep) * time.Second)
+	}
 }
