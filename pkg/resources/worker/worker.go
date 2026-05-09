@@ -134,3 +134,9 @@ func (w *Worker) RunTasks() {
 		time.Sleep(time.Second * 10)
 	}
 }
+
+func (w *Worker) InspectTask(t task.Task) docker.DockerInspectResponse {
+	d := docker.NewDocker(task.NewConfig(&t))
+
+	return d.Inspect(t.ContainerID)
+}
