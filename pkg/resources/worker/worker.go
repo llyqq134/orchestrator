@@ -116,7 +116,7 @@ func (w *Worker) StopTask(t task.Task) docker.Result {
 	task.StateCompleted(&t)
 	w.Db[t.UUID] = &t
 
-	log.Printf(op+"Stopped and removerd container %v for task %v\n", t.ContainerID, t.UUID)
+	log.Printf(op+"Stopped and removed container %v for task %v\n", t.ContainerID, t.UUID)
 
 	return result
 }
