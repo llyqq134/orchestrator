@@ -1,13 +1,14 @@
-package main
+package main 
 
 import (
 	"fmt"
-	"log"
+	"net/http"
+	"time"
+
 	"orchestrator/config"
+	"orchestrator/pkg/resources/manager"
 	"orchestrator/pkg/resources/task"
 	"orchestrator/pkg/resources/worker"
-	"orchestrator/pkg/resources/manager"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-collections/collections/queue"
@@ -16,81 +17,88 @@ import (
 )
 
 func main() {
-	router := gin.Default()
+	workerRouter := gin.Default()
+	managerRouter := gin.Default()
 
-	var cfg config.Server
+	var cfg config.Config
+
 	err := cleanenv.ReadConfig("../../config/server.yaml", &cfg)
 	if err != nil {
 		panic(err)
 	}
 
-	fmt.Println("Starting cube worker")
-
-	w := worker.Worker {
+	w := worker.Worker{
 		Queue: *queue.New(),
-		Db: make(map[uuid.UUID]*task.Task),
+		Db:    make(map[uuid.UUID]*task.Task),
 	}
 
-	api := worker.Api{Host: cfg.Host, Port: cfg.Port, Worker: &w, Router: router}
-	api.Register()
+	workers := []string{
+		fmt.Sprintf("%v:%v", cfg.Worker.Host, cfg.Worker.Port),
+	}
 
-	go RunTasks(&w)
-	go w.CollectStats()
-
-	go func() {
-		router.Use()
-  	router.Run(fmt.Sprintf("%v:%v", cfg.Host, cfg.Port))
-	}()
-
-	workers := []string{fmt.Sprintf("%v:%v", cfg.Host, cfg.Port)}
 	m := manager.New(workers)
 
-	for i := range 3 {
-		t := task.Task {
-			UUID: uuid.New(),
-			Name: fmt.Sprintf("test-container-%d", i),
-			State: task.Scheduled,
-			Image: "strm/helloworld-http",
-		}
-
-		te := task.Event {
-			UUID: uuid.New(),
-			State: task.Running,
-			Task: t,
-		}
-
-		m.AddTask(te)
-		m.SendWork()
+	workerApi := worker.Api{
+		Host:   cfg.Worker.Host,
+		Port:   cfg.Worker.Port,
+		Worker: &w,
+		Router: workerRouter,
 	}
 
+	workerApi.Register()
+
+	managerApi := manager.Api{
+		Host:    cfg.Manager.Host,
+		Port:    cfg.Manager.Port,
+		Manager: m,
+		Router:  managerRouter,
+	}
+
+	managerApi.Register()
+
+	workerAddr := fmt.Sprintf(
+		"%v:%v",
+		cfg.Worker.Host,
+		cfg.Worker.Port,
+	)
+
 	go func() {
-		for {
-			fmt.Printf("[Manager] Updating task from %d workers\n", len(m.Workers))
-			m.UpdateTasks()
-			time.Sleep(15 * time.Second)
+		if err := workerRouter.Run(workerAddr); err != nil {
+			panic(err)
 		}
 	}()
 
-	for {
-		for _, t := range m.TaskDb {
-			fmt.Printf("[Manager] Task:\n\tUUID: %v\n\tState: %v\n", t.UUID, t.State)
-			time.Sleep(15 * time.Second)
-		}
+	waitForServer("http://" + workerAddr + "/health")
+
+	go w.RunTasks()
+	go w.CollectStats()
+	go m.ProcessTasks()
+	go m.UpdateTasks()
+
+	managerAddr := fmt.Sprintf(
+		"%v:%v",
+		cfg.Manager.Host,
+		cfg.Manager.Port,
+	)
+
+	if err := managerRouter.Run(managerAddr); err != nil {
+		panic(err)
 	}
 }
 
-func RunTasks(w *worker.Worker) {
+func waitForServer(url string) {
 	for {
-		if w.Queue.Len() != 0 {
-			result := w.RunTask()
-			if result.Error != nil {
-				log.Printf("Error running task: %v\n", result.Error)
-			} 
-		} else {
-			log.Println("No tasks to process currently")
+		resp, err := http.Get(url)
+
+		if err == nil && resp.StatusCode == http.StatusOK {
+			resp.Body.Close()
+			return
 		}
 
-		log.Println("waiting for 10 sec")
-		time.Sleep(time.Second * 10)
+		if resp != nil {
+			resp.Body.Close()
+		}
+
+		time.Sleep(100 * time.Millisecond)
 	}
 }
