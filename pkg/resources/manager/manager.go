@@ -3,11 +3,13 @@ package manager
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"orchestrator/pkg/resources/task"
+	"strings"
 	"time"
 
 	"github.com/golang-collections/collections/queue"
@@ -193,4 +195,36 @@ func (m *Manager) ProcessTasks() {
 
 		time.Sleep(time.Duration(timeToSleep) * time.Second)
 	}
+}
+
+func (m *Manager) checkTaskHealth(t task.Task) error {
+	op := "[manager.checkTaskHealth]: "
+	log.Printf(op+"Calling health check for task %s: %s\n", t.UUID, t.HealthCheck)
+
+	w := m.TaskWorkerMap[t.UUID]
+	hostPort := t.GetHostPort(t.HostPorts)
+
+	worker := strings.Split(w, ":")
+	url := fmt.Sprintf("http://%s:%s%s", worker[0], *hostPort, t.HealthCheck)
+
+	log.Printf(op+"Calling health check for task %s: %s\n", t.UUID, url)
+
+	resp, err := http.Get(url)
+	if err != nil {
+		msg := fmt.Sprintf("Error connecting to health check %s", url)
+		log.Println(op + msg)
+
+		return errors.New(msg)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		msg := fmt.Sprintf("Error health check for task %s did not return 200\n", t.UUID)
+		log.Println(op + msg)
+
+		return errors.New(msg)
+	}
+
+	log.Printf(op+"Task %s Health check response: %v\n", t.UUID, resp.StatusCode)
+
+	return nil
 }
