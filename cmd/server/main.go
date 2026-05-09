@@ -1,4 +1,4 @@
-package main 
+package main
 
 import (
 	"fmt"
@@ -74,6 +74,7 @@ func main() {
 	go w.CollectStats()
 	go m.ProcessTasks()
 	go m.UpdateTasks()
+	go m.DoTaskHealthCheck()
 
 	managerAddr := fmt.Sprintf(
 		"%v:%v",
