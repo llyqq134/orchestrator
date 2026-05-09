@@ -286,3 +286,18 @@ func (m *Manager) restartTask(t *task.Task) {
 
 	log.Printf(op+"%#v\n", t)
 }
+
+func (m *Manager) DoTaskHealthCheck() {
+	op := "[manager.DoTaskHealthCheck]: "
+
+	for {
+		log.Println(op + "Performing task health check")
+		m.doTaskHealthCheck()
+
+		log.Println(op + "Task health checks completed")
+
+		timeToSleep := 45
+		log.Printf(op+"Sleeping for %v seconds\n", timeToSleep)
+		time.Sleep(time.Duration(timeToSleep) * time.Second)
+	}
+}
