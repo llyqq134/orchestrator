@@ -228,3 +228,61 @@ func (m *Manager) checkTaskHealth(t task.Task) error {
 
 	return nil
 }
+
+func (m *Manager) doTaskHealthCheck() {
+	for _, t := range m.GetTasks() {
+		if t.State == task.Running && t.RestartCount < 3 {
+			if err := m.checkTaskHealth(*t); err != nil && t.RestartCount < 3 {
+				m.restartTask(t)
+			}
+		} else if t.State == task.Failed && t.RestartCount < 3 {
+			m.restartTask(t)
+		}
+	}
+}
+
+func (m *Manager) restartTask(t *task.Task) {
+	op := "[manager.restartTask]: "
+
+	w := m.TaskWorkerMap[t.UUID]
+	t.State = task.Scheduled
+	t.RestartCount++
+	m.TaskDb[t.UUID] = t
+
+	te := task.Event{
+		UUID:      uuid.New(),
+		State:     task.Running,
+		Timestamp: time.Now(),
+		Task:      *t,
+	}
+
+	data, err := json.Marshal(te)
+	if err != nil {
+		log.Printf(op+"Unable to marshal task object: %v", t)
+		return
+	}
+
+	url := fmt.Sprintf("http://%s/tasks", w)
+	resp, err := http.Post(url, "application/json", bytes.NewBuffer(data))
+	if err != nil {
+		log.Printf(op+"Error connecting to %v: %v\n", w, err)
+		m.Pending.Enqueue(t)
+	}
+
+	defer resp.Body.Close()
+
+	d := json.NewDecoder(resp.Body)
+	if resp.StatusCode != http.StatusCreated {
+		body, _ := io.ReadAll(resp.Body)
+		log.Printf(op+"Response error (%v): %s\n", resp.StatusCode, string(body))
+		return
+	}
+
+	newTask := task.Task{}
+	if err = d.Decode(&newTask); err != nil {
+		log.Printf("%v: Error decoding response body: %v\n", op, err.Error())
+		return
+	}
+
+	log.Printf(op+"%#v\n", t)
+}
