@@ -18,7 +18,10 @@ type Task struct {
 	Disk          int
 	ExposedPorts  nat.PortSet
 	PortBindings  map[string]string
+	HostPorts     nat.PortMap
 	RestartPolicy string
 	StartTime     time.Time
 	FinishTime    time.Time
+	HealthCheck   string
+	RestartCount  int
 }

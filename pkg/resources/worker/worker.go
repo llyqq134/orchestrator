@@ -25,7 +25,7 @@ type Worker struct {
 func (w *Worker) CollectStats() {
 	op := "[worker.CollectStats]: "
 	for {
-		log.Printf(op + "Collecting stats\n")
+		log.Println(op + "Collecting stats\n")
 		w.Stats = metrics.GetStats()
 		w.Stats.TaskCount = w.TaskCount
 		timeToSleep := 10
@@ -74,7 +74,7 @@ func (w *Worker) runTask() docker.Result {
 			result.Error = errors.New(op + "unreachable")
 		}
 	} else {
-		err := fmt.Errorf(op + "Invalid transition from %v to %v", taskPersisted.State, taskQueued.State)
+		err := fmt.Errorf(op+"Invalid transition from %v to %v", taskPersisted.State, taskQueued.State)
 		result.Error = err
 	}
 
@@ -90,7 +90,7 @@ func (w *Worker) StartTask(t task.Task) docker.Result {
 
 	result := d.Run()
 	if result.Error != nil {
-		log.Printf(op + "Error running task %v: %v\n", t.UUID, result.Error)
+		log.Printf(op+"Error running task %v: %v\n", t.UUID, result.Error)
 		task.StateFailed(&t)
 	} else {
 		t.ContainerID = result.ContainerID
@@ -109,24 +109,25 @@ func (w *Worker) StopTask(t task.Task) docker.Result {
 
 	result := d.Stop(t.ContainerID)
 	if result.Error != nil {
-		log.Printf(op + "Error stopping container %v: %v\n", t.ContainerID, result.Error)
+		log.Printf(op+"Error stopping container %v: %v\n", t.ContainerID, result.Error)
 	}
 
 	t.FinishTime = time.Now().UTC()
 	task.StateCompleted(&t)
 	w.Db[t.UUID] = &t
 
-	log.Printf(op + "Stopped and removerd container %v for task %v\n", t.ContainerID, t.UUID)
+	log.Printf(op+"Stopped and removerd container %v for task %v\n", t.ContainerID, t.UUID)
 
 	return result
 }
 
 func (w *Worker) RunTasks() {
+	op := "[worker.RunTasks]: "
 	for {
 		if w.Queue.Len() != 0 {
 			result := w.runTask()
 			if result.Error != nil {
-				log.Printf(op + "Error running task: %v\n", result.Error)
+				log.Printf(op+"Error running task: %v\n", result.Error)
 			}
 		} else {
 			log.Println(op + "No tasks to process currently")
@@ -143,15 +144,41 @@ func (w *Worker) InspectTask(t task.Task) docker.DockerInspectResponse {
 	return d.Inspect(t.ContainerID)
 }
 
+func (w *Worker) updateTasks() {
+	op := "[worker.updateTasks]: "
+	for id, t := range w.Db {
+		if t.State == task.Running {
+			resp := w.InspectTask(*t)
+			if resp.Error != nil {
+				fmt.Printf("%vERROR: %v\n", op, resp.Error)
+			}
+
+			if resp.Container == nil {
+				log.Printf(op+"No container for running task %s\n", id)
+				task.StateFailed(w.Db[id])
+			}
+
+			if resp.Container.State.Status == "exited" {
+				log.Printf(op+"Container for task %s in non running state %s",
+					id, resp.Container.State.Status)
+				task.StateFailed(w.Db[id])
+			}
+
+			w.Db[id].HostPorts =
+				resp.Container.NetworkSettings.NetworkSettingsBase.Ports
+		}
+	}
+}
+
 func (w *Worker) UpdateTasks() {
 	op := "[worker.UpdateTasks]: "
 	for {
 		log.Println(op + "Checking status of tasks")
 		w.updateTasks()
 		log.Println(op + "Task updates complete")
-		
+
 		timeToSleep := 10
-		log.Printf(op + "Sleeping for %v seconds\n", timeToSleep)
+		log.Printf(op+"Sleeping for %v seconds\n", timeToSleep)
 		time.Sleep(time.Duration(timeToSleep) * time.Second)
 	}
 }
