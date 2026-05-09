@@ -1,21 +1,28 @@
 package manager
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
-	"time"
 	"orchestrator/pkg/resources/task"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
 const (
+	healthURL = "/health"						//GET
+)
+
+const (
 	mainURL = "/tasks"
 
-	getTasksURL = ""						//GET
-	createTaskURL = ""					//POST 
-	deleteTaskURL = "/:UUID"		//DELETE 
+	getTasksURL = ""								//GET
+	getTasksURLTrailingSlash = "/"	//GET
+	createTaskURL = ""							//POST 
+	crateTaskURLTrailingSlsh = "/"	//POST
+	deleteTaskURL = "/:UUID"				//DELETE 
 )
 
 type Api struct {
@@ -29,20 +36,43 @@ func (a *Api)Register() {
 	tasks := a.Router.Group(mainURL)	 
 	{
 		tasks.GET(getTasksURL, a.GetTasksHandler)
+		tasks.GET(getTasksURLTrailingSlash, a.GetTasksHandler)
+
 		tasks.POST(createTaskURL, a.CreateTaskHandler)
+		tasks.POST(crateTaskURLTrailingSlsh, a.CreateTaskHandler)
+
 		tasks.DELETE(deleteTaskURL, a.DeleteTaskHandler)
 	}
+	a.Router.GET(healthURL, a.GetHealth)
+}
+
+func (a *Api)GetHealth (c *gin.Context){
+	c.JSON(200, nil)
 }
 
 func (a *Api)GetTasksHandler(c *gin.Context) {
 	c.JSON(200, a.Manager.GetTasks())
 }
 
-func (a *Api)CreateTaskHandler(c *gin.Context) {
-	var te task.Event
+func hasTaskPayload(t task.Task) bool {
+	return t.UUID != uuid.Nil ||
+		t.Name != "" ||
+		t.Image != "" ||
+		t.CPU != 0 ||
+		t.Memory != 0 ||
+		t.Disk != 0 ||
+		len(t.ExposedPorts) != 0 ||
+		len(t.PortBindings) != 0 ||
+		t.RestartPolicy != ""
+}
 
-	if err := c.ShouldBindJSON(&te); err != nil {
-		msg := fmt.Sprintf("Error unmarshalling body: %v", err)
+func (a *Api)CreateTaskHandler(c *gin.Context) {
+	te := task.Event{}
+	flatTask := task.Task{}
+	
+	body, err := c.GetRawData()
+	if err != nil {
+		msg := fmt.Sprintf("Error reading body: %v", err)
 		log.Println(msg)
 
 		c.JSON(400, gin.H {
@@ -53,11 +83,31 @@ func (a *Api)CreateTaskHandler(c *gin.Context) {
 		return				
 	}
 
+	if err := json.Unmarshal(body, &te); err != nil {
+		msg := fmt.Sprintf("Error unmarshalling body: %v", err)
+		log.Println(msg)
+
+		c.JSON(400, gin.H {
+			"statusCode": 400, 
+			"Message": msg,
+		})
+
+		return
+	}
+
+	if err := json.Unmarshal(body, &flatTask);
+		err != nil && !hasTaskPayload(te.Task) && hasTaskPayload(flatTask) {
+		te.Task = flatTask
+	}
+
+	te.UUID = uuid.New()
+	te.Task.UUID = te.UUID
 	a.Manager.AddTask(te)
-	log.Printf("Added task %v\n", te.Task.UUID)
+	log.Printf("Added task %v\n", te.UUID)
 
 	c.JSON(201, gin.H {
 		"Message": "Task created",
+		"Id": te.UUID,
 	})
 }
 
