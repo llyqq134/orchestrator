@@ -67,13 +67,15 @@ func hasTaskPayload(t task.Task) bool {
 }
 
 func (a *Api) CreateTaskHandler(c *gin.Context) {
+	op := "[manager.CreteTaskHandler]: "
+
 	te := task.Event{}
 	flatTask := task.Task{}
 
 	body, err := c.GetRawData()
 	if err != nil {
 		msg := fmt.Sprintf("Error reading body: %v", err)
-		log.Println(msg)
+		log.Println(op + msg)
 
 		c.JSON(400, gin.H{
 			"statusCode": 400,
@@ -85,7 +87,7 @@ func (a *Api) CreateTaskHandler(c *gin.Context) {
 
 	if err := json.Unmarshal(body, &te); err != nil {
 		msg := fmt.Sprintf("Error unmarshalling body: %v", err)
-		log.Println(msg)
+		log.Println(op + msg)
 
 		c.JSON(400, gin.H{
 			"statusCode": 400,
@@ -102,7 +104,7 @@ func (a *Api) CreateTaskHandler(c *gin.Context) {
 	te.UUID = uuid.New()
 	te.Task.UUID = te.UUID
 	a.Manager.AddTask(te)
-	log.Printf("Added task %v\n", te.UUID)
+	log.Printf(op+"Added task %v\n", te.UUID)
 
 	c.JSON(201, gin.H{
 		"Message": "Task created",
@@ -111,10 +113,12 @@ func (a *Api) CreateTaskHandler(c *gin.Context) {
 }
 
 func (a *Api) DeleteTaskHandler(c *gin.Context) {
+	op := "[manager.DeleteTaskHandler]: "
+
 	strID := c.Param("UUID")
 
 	if strID == "" {
-		log.Printf("No task UUID passed in request\n")
+		log.Println(op + "No task UUID passed in request")
 		c.JSON(400, gin.H{
 			"Message": "Bad request",
 		})
@@ -133,7 +137,7 @@ func (a *Api) DeleteTaskHandler(c *gin.Context) {
 
 	taskToDelete, ok := a.Manager.TaskDb[taskUUID]
 	if !ok {
-		log.Printf("No task with UUID: %v\n", taskUUID)
+		log.Printf(op+"No task with UUID: %v\n", taskUUID)
 		c.JSON(404, gin.H{
 			"statusCode": 404,
 			"Message":    "No task with this UUID",
@@ -151,7 +155,7 @@ func (a *Api) DeleteTaskHandler(c *gin.Context) {
 	te.Task = taskCopy
 	a.Manager.AddTask(te)
 
-	log.Printf("Added task event %v to delete task %v\n", te.UUID, taskToDelete.UUID)
+	log.Printf(op+"Added task event %v to delete task %v\n", te.UUID, taskToDelete.UUID)
 
 	c.JSON(204, gin.H{})
 }

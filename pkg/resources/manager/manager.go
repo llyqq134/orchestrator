@@ -61,7 +61,7 @@ func (m *Manager) SelectWorker() string {
 }
 
 func (m *Manager) SendWork() {
-	op := "manager.SendWork"
+	op := "[manager.SendWork]: "
 
 	if m.Pending.Len() > 0 {
 		chosenWorker := m.SelectWorker()
@@ -116,7 +116,7 @@ func (m *Manager) SendWork() {
 }
 
 func (m *Manager) updateTasks() {
-	op := "manager.updateTasks"
+	op := "[manager.updateTasks]: "
 
 	for _, worker := range m.Workers {
 		log.Printf("Checking worker %v for the task update\n", worker)
