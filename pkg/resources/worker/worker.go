@@ -118,7 +118,7 @@ func (w *Worker) StopTask(t task.Task) docker.Result {
 	return result
 }
 
-func RunTasks() {
+func (w *Worker) RunTasks() {
 	for {
 		if w.Queue.Len() != 0 {
 			result := w.runTask()
