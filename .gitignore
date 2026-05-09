@@ -7,6 +7,7 @@
 *.dll
 *.so
 *.dylib
+*.bin
 
 # Test binary, built with `go test -c`
 *.test
@@ -28,7 +29,10 @@ go.work.sum
 .env
 
 # yaml configs
-.yaml
+*.yaml
+
+# json
+*.json
 
 # Editor/IDE
 # .idea/
