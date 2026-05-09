@@ -16,10 +16,16 @@ type Api struct {
 }
 
 const (
+	healthURL = "/health" 							// GET
+)
+
+const (
 	mainTaskUrl = "/tasks"
 
 	startTaskURL = 		""			 					// POST
+	startTaskURLTrailingSlash = "/"			// POST
 	getAllTasksURL = 	""	 							// GET
+	getAllTasksURLTrailingSlash = "/"		// Get 
 	getTaskByIdURL = 	"/:UUID" 					// GET
 	deleteTaskURL = 	"/:UUID"				 	// DELETE
 )
@@ -31,11 +37,17 @@ const (
 )
 
 func (a *Api) Register () {
+	a.Router.GET(healthURL, a.GetHealth)	
 	tasks := a.Router.Group(mainTaskUrl)
 	{
 		tasks.POST(startTaskURL, a.StartTaskHandler)
+		tasks.POST(startTaskURLTrailingSlash, a.StartTaskHandler)
+
 		tasks.GET(getAllTasksURL, a.GetAllTasksHandler)
+		tasks.GET(getAllTasksURLTrailingSlash, a.GetAllTasksHandler)
+
 		tasks.GET(getTaskByIdURL, a.GetTaskByIdHandler)
+
 		tasks.DELETE(deleteTaskURL, a.StopTaskHandler)
 	}
 
@@ -45,11 +57,13 @@ func (a *Api) Register () {
 	}
 }
 
+func (a *Api) GetHealth(c *gin.Context) {
+	c.JSON(200, nil)
+}
+
 func (a *Api) StartTaskHandler(c *gin.Context) {
 	te := task.Event{}
-	te.UUID = uuid.New()
 
-	te.Task.UUID = te.UUID
 	if err := c.BindJSON(&te); err != nil {
 		log.Printf("Error binding a task: %v\n", err.Error())
 		c.JSON(400, gin.H {
@@ -58,6 +72,14 @@ func (a *Api) StartTaskHandler(c *gin.Context) {
 		})
 
 		return
+	}
+
+	if te.UUID == uuid.Nil {
+		te.UUID = uuid.New()
+	}
+
+	if te.Task.UUID == uuid.Nil {
+		te.Task.UUID = te.UUID
 	}
 
 	a.Worker.AddTask(te.Task)
