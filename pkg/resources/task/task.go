@@ -25,3 +25,11 @@ type Task struct {
 	HealthCheck   string
 	RestartCount  int
 }
+
+func (t *Task) GetHostPort(ports nat.PortMap) *string {
+	for k := range ports {
+		return &ports[k][0].HostPort
+	}
+
+	return nil
+}
