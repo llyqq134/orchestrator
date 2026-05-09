@@ -12,28 +12,28 @@ import (
 )
 
 const (
-	healthURL = "/health"						//GET
+	healthURL = "/health" //GET
 )
 
 const (
 	mainURL = "/tasks"
 
-	getTasksURL = ""								//GET
-	getTasksURLTrailingSlash = "/"	//GET
-	createTaskURL = ""							//POST 
-	crateTaskURLTrailingSlsh = "/"	//POST
-	deleteTaskURL = "/:UUID"				//DELETE 
+	getTasksURL              = ""       //GET
+	getTasksURLTrailingSlash = "/"      //GET
+	createTaskURL            = ""       //POST
+	crateTaskURLTrailingSlsh = "/"      //POST
+	deleteTaskURL            = "/:UUID" //DELETE
 )
 
 type Api struct {
-	Host string 
-	Port string 
+	Host    string
+	Port    string
 	Manager *Manager
-	Router *gin.Engine
-} 
+	Router  *gin.Engine
+}
 
-func (a *Api)Register() {
-	tasks := a.Router.Group(mainURL)	 
+func (a *Api) Register() {
+	tasks := a.Router.Group(mainURL)
 	{
 		tasks.GET(getTasksURL, a.GetTasksHandler)
 		tasks.GET(getTasksURLTrailingSlash, a.GetTasksHandler)
@@ -46,11 +46,11 @@ func (a *Api)Register() {
 	a.Router.GET(healthURL, a.GetHealth)
 }
 
-func (a *Api)GetHealth (c *gin.Context){
+func (a *Api) GetHealth(c *gin.Context) {
 	c.JSON(200, nil)
 }
 
-func (a *Api)GetTasksHandler(c *gin.Context) {
+func (a *Api) GetTasksHandler(c *gin.Context) {
 	c.JSON(200, a.Manager.GetTasks())
 }
 
@@ -66,37 +66,36 @@ func hasTaskPayload(t task.Task) bool {
 		t.RestartPolicy != ""
 }
 
-func (a *Api)CreateTaskHandler(c *gin.Context) {
+func (a *Api) CreateTaskHandler(c *gin.Context) {
 	te := task.Event{}
 	flatTask := task.Task{}
-	
+
 	body, err := c.GetRawData()
 	if err != nil {
 		msg := fmt.Sprintf("Error reading body: %v", err)
 		log.Println(msg)
 
-		c.JSON(400, gin.H {
+		c.JSON(400, gin.H{
 			"statusCode": 400,
-			"Message": msg,
-		})																							
+			"Message":    msg,
+		})
 
-		return				
+		return
 	}
 
 	if err := json.Unmarshal(body, &te); err != nil {
 		msg := fmt.Sprintf("Error unmarshalling body: %v", err)
 		log.Println(msg)
 
-		c.JSON(400, gin.H {
-			"statusCode": 400, 
-			"Message": msg,
+		c.JSON(400, gin.H{
+			"statusCode": 400,
+			"Message":    msg,
 		})
 
 		return
 	}
 
-	if err := json.Unmarshal(body, &flatTask);
-		err != nil && !hasTaskPayload(te.Task) && hasTaskPayload(flatTask) {
+	if err := json.Unmarshal(body, &flatTask); err != nil && !hasTaskPayload(te.Task) && hasTaskPayload(flatTask) {
 		te.Task = flatTask
 	}
 
@@ -105,27 +104,27 @@ func (a *Api)CreateTaskHandler(c *gin.Context) {
 	a.Manager.AddTask(te)
 	log.Printf("Added task %v\n", te.UUID)
 
-	c.JSON(201, gin.H {
+	c.JSON(201, gin.H{
 		"Message": "Task created",
-		"Id": te.UUID,
+		"Id":      te.UUID,
 	})
 }
 
-func (a *Api)DeleteTaskHandler(c *gin.Context) {
+func (a *Api) DeleteTaskHandler(c *gin.Context) {
 	strID := c.Param("UUID")
 
 	if strID == "" {
 		log.Printf("No task UUID passed in request\n")
-		c.JSON(400, gin.H {
+		c.JSON(400, gin.H{
 			"Message": "Bad request",
 		})
 
-		return 
+		return
 	}
 
-	taskUUID, err := uuid.Parse(strID)	
+	taskUUID, err := uuid.Parse(strID)
 	if err != nil {
-		c.JSON(503, gin.H {
+		c.JSON(503, gin.H{
 			"Message": "Error parsing uuid",
 		})
 
@@ -135,20 +134,20 @@ func (a *Api)DeleteTaskHandler(c *gin.Context) {
 	taskToDelete, ok := a.Manager.TaskDb[taskUUID]
 	if !ok {
 		log.Printf("No task with UUID: %v\n", taskUUID)
-		c.JSON(404, gin.H {
+		c.JSON(404, gin.H{
 			"statusCode": 404,
-			"Message": "No task with this UUID",
+			"Message":    "No task with this UUID",
 		})
 	}
 
-	te := task.Event {
-		UUID: uuid.New(),
-		State: task.Completed,
-		Timestamp: time.Now(),
+	te := task.Event{
+		UUID:      uuid.New(),
+		State:     task.Completed,
+		Timestamp: time.Now().UTC(),
 	}
 
 	taskCopy := *taskToDelete
-	task.StateCompleted(taskCopy)
+	task.StateCompleted(&taskCopy)
 	te.Task = taskCopy
 	a.Manager.AddTask(te)
 
@@ -156,4 +155,3 @@ func (a *Api)DeleteTaskHandler(c *gin.Context) {
 
 	c.JSON(204, gin.H{})
 }
-

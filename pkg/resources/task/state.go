@@ -42,32 +42,32 @@ func ValidateTransition(from, to State) bool {
 	return slices.Contains(stateTransitionMap[from], to)
 }
 
-func StatePending(task Task) {
-	setState(&task, Pending)
+func StatePending(task *Task) {
+	setState(task, Pending)
 }
 
-func StateScheduled(task Task) {
-	setState(&task, Scheduled) 
+func StateScheduled(task *Task) {
+	setState(task, Scheduled) 
 }
 
-func StateRunning(task Task) {
-	setState(&task, Running)
+func StateRunning(task *Task) {
+	setState(task, Running)
 }
 
-func StateCompleted(task Task) {
-	setState(&task, Completed)
+func StateCompleted(task *Task) {
+	setState(task, Completed)
 
 	// enter logic
 	task.FinishTime = time.Now().UTC()
 }
 
-func StateFailed(task Task) {
+func StateFailed(task *Task) {
 	switch task.State {
 	case Pending:
 	case Scheduled:
 	}
 
-	setState(&task, Failed)
+	setState(task, Failed)
 }
 
 func setState(task *Task, newValue State) {

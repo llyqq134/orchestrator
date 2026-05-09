@@ -1,14 +1,14 @@
 package worker
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"time"
-	"errors"
 
 	"orchestrator/pkg/docker"
-	"orchestrator/pkg/resources/task"
 	"orchestrator/pkg/metrics"
+	"orchestrator/pkg/resources/task"
 
 	"github.com/golang-collections/collections/queue"
 	"github.com/google/uuid"
@@ -19,7 +19,7 @@ type Worker struct {
 	Queue     queue.Queue
 	Db        map[uuid.UUID]*task.Task
 	TaskCount int
-	Stats *metrics.Stats
+	Stats     *metrics.Stats
 }
 
 func (w *Worker) CollectStats() {
@@ -31,9 +31,9 @@ func (w *Worker) CollectStats() {
 	}
 }
 
-func (w *Worker) GetTasks() []*task.Task{
+func (w *Worker) GetTasks() []*task.Task {
 	tasks := []*task.Task{}
-	
+
 	for _, t := range w.Db {
 		tasks = append(tasks, t)
 	}
@@ -64,15 +64,15 @@ func (w *Worker) runTask() docker.Result {
 	var result docker.Result
 	if task.ValidateTransition(taskPersisted.State, taskQueued.State) {
 		switch taskQueued.State {
-			case task.Scheduled:
-				result = w.StartTask(taskQueued)
-			case task.Completed:
-				result = w.StopTask(taskQueued)
-			default:
-				result.Error = errors.New(op + "unreachable")
+		case task.Scheduled:
+			result = w.StartTask(taskQueued)
+		case task.Completed:
+			result = w.StopTask(taskQueued)
+		default:
+			result.Error = errors.New(op + "unreachable")
 		}
 	} else {
-		err := fmt.Errorf(op + "Invalid transition from %v to %v", taskPersisted.State, taskQueued.State)
+		err := fmt.Errorf(op+"Invalid transition from %v to %v", taskPersisted.State, taskQueued.State)
 		result.Error = err
 	}
 
@@ -88,11 +88,11 @@ func (w *Worker) StartTask(t task.Task) docker.Result {
 
 	result := d.Run()
 	if result.Error != nil {
-		log.Printf(op + "Error running task %v: %v\n", t.UUID, result.Error)
-		task.StateFailed(t)
+		log.Printf(op+"Error running task %v: %v\n", t.UUID, result.Error)
+		task.StateFailed(&t)
 	} else {
 		t.ContainerID = result.ContainerID
-		task.StateRunning(t)
+		task.StateRunning(&t)
 	}
 
 	w.Db[t.UUID] = &t
@@ -107,13 +107,14 @@ func (w *Worker) StopTask(t task.Task) docker.Result {
 
 	result := d.Stop(t.ContainerID)
 	if result.Error != nil {
-		log.Printf(op + "Error stopping container %v: %v\n", t.ContainerID, result.Error)
+		log.Printf(op+"Error stopping container %v: %v\n", t.ContainerID, result.Error)
 	}
 
-	task.StateCompleted(t)
+	t.FinishTime = time.Now().UTC()
+	task.StateCompleted(&t)
 	w.Db[t.UUID] = &t
 
-	log.Printf(op + "Stopped and removerd container %v for task %v\n", t.ContainerID, t.UUID)
+	log.Printf(op+"Stopped and removerd container %v for task %v\n", t.ContainerID, t.UUID)
 
 	return result
 }
@@ -124,7 +125,7 @@ func (w *Worker) RunTasks() {
 			result := w.runTask()
 			if result.Error != nil {
 				log.Printf("Error running task: %v\n", result.Error)
-			} 
+			}
 		} else {
 			log.Println("No tasks to process currently")
 		}

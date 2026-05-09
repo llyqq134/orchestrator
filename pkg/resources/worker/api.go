@@ -9,35 +9,35 @@ import (
 )
 
 type Api struct {
-	Host string
-	Port string
+	Host   string
+	Port   string
 	Worker *Worker
 	Router *gin.Engine
 }
 
 const (
-	healthURL = "/health" 							// GET
+	healthURL = "/health" // GET
 )
 
 const (
 	mainTaskUrl = "/tasks"
 
-	startTaskURL = 		""			 					// POST
-	startTaskURLTrailingSlash = "/"			// POST
-	getAllTasksURL = 	""	 							// GET
-	getAllTasksURLTrailingSlash = "/"		// Get 
-	getTaskByIdURL = 	"/:UUID" 					// GET
-	deleteTaskURL = 	"/:UUID"				 	// DELETE
+	startTaskURL                = ""       // POST
+	startTaskURLTrailingSlash   = "/"      // POST
+	getAllTasksURL              = ""       // GET
+	getAllTasksURLTrailingSlash = "/"      // Get
+	getTaskByIdURL              = "/:UUID" // GET
+	deleteTaskURL               = "/:UUID" // DELETE
 )
 
 const (
 	mainStatUrl = "/stats"
 
-	statsURL = "" 											// GET
+	statsURL = "" // GET
 )
 
-func (a *Api) Register () {
-	a.Router.GET(healthURL, a.GetHealth)	
+func (a *Api) Register() {
+	a.Router.GET(healthURL, a.GetHealth)
 	tasks := a.Router.Group(mainTaskUrl)
 	{
 		tasks.POST(startTaskURL, a.StartTaskHandler)
@@ -66,9 +66,9 @@ func (a *Api) StartTaskHandler(c *gin.Context) {
 
 	if err := c.BindJSON(&te); err != nil {
 		log.Printf("Error binding a task: %v\n", err.Error())
-		c.JSON(400, gin.H {
+		c.JSON(400, gin.H{
 			"message": "Bad request",
-			"error": err.Error(),
+			"error":   err.Error(),
 		})
 
 		return
@@ -85,9 +85,9 @@ func (a *Api) StartTaskHandler(c *gin.Context) {
 	a.Worker.AddTask(te.Task)
 	log.Printf("Added task %v\n", te.Task.UUID)
 
-	c.JSON(201, gin.H {
+	c.JSON(201, gin.H{
 		"message": "Task was created",
-		"id": te.UUID,
+		"id":      te.UUID,
 	})
 }
 
@@ -101,7 +101,7 @@ func (a *Api) GetTaskByIdHandler(c *gin.Context) {
 	if strID == "" {
 		log.Println("No task passed in request")
 
-		c.JSON(400, gin.H {
+		c.JSON(400, gin.H{
 			"message": "No task passed in request",
 		})
 	}
@@ -111,15 +111,15 @@ func (a *Api) GetTaskByIdHandler(c *gin.Context) {
 		log.Printf("Error parsing uuid: %v\n", err)
 		c.JSON(400, gin.H{
 			"message": "Bad request",
-			"error": err.Error,
+			"error":   err.Error,
 		})
 
 		return
 	}
 
-	if 	_, ok := a.Worker.Db[taskId]; !ok {
+	if _, ok := a.Worker.Db[taskId]; !ok {
 		log.Printf("No task with id %v found\n", taskId)
-		c.JSON(404, gin.H {
+		c.JSON(404, gin.H{
 			"message": "Task wasn't found",
 		})
 		return
@@ -133,7 +133,7 @@ func (a *Api) StopTaskHandler(c *gin.Context) {
 
 	if strID == "" {
 		log.Println("No taskId passed in request")
-		c.JSON(400, gin.H {
+		c.JSON(400, gin.H{
 			"message": "No taskID passed in request",
 		})
 
@@ -143,18 +143,18 @@ func (a *Api) StopTaskHandler(c *gin.Context) {
 	taskId, err := uuid.Parse(strID)
 	if err != nil {
 		log.Printf("error parsing uuid: %v\n", err)
-		c.JSON(400, gin.H {
+		c.JSON(400, gin.H{
 			"message": "error parsing uuid",
-			"error": err.Error,
+			"error":   err.Error,
 		})
 
 		return
 	}
-	
+
 	if _, ok := a.Worker.Db[taskId]; !ok {
 		log.Printf("No task with id %v found\n", taskId)
 
-		c.JSON(404, gin.H {
+		c.JSON(404, gin.H{
 			"message": "task wasn't found",
 		})
 
@@ -163,12 +163,12 @@ func (a *Api) StopTaskHandler(c *gin.Context) {
 
 	taskToStop := a.Worker.Db[taskId]
 	taskCopy := *taskToStop
-	task.StateCompleted(taskCopy)
+	task.StateCompleted(&taskCopy)
 	a.Worker.StopTask(taskCopy)
 
 	log.Printf("Added task %v to stop container %v\n", taskToStop.UUID, taskToStop.ContainerID)
 
-	c.JSON(204, gin.H {
+	c.JSON(204, gin.H{
 		"message": "task was deleted",
 	})
 }

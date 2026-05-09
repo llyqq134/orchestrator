@@ -21,7 +21,7 @@ type Manager struct {
 	Workers       []string
 	WorkerTaskMap map[string][]uuid.UUID
 	TaskWorkerMap map[uuid.UUID]string
-	LastWorker int 
+	LastWorker    int
 }
 
 func New(workers []string) *Manager {
@@ -35,19 +35,19 @@ func New(workers []string) *Manager {
 	}
 
 	return &Manager{
-		Pending: *queue.New(),
-		TaskDb: taskDB,
-		EventDb: eventDB,
-		Workers: workers,
-	 	WorkerTaskMap: workerTaskMap,
+		Pending:       *queue.New(),
+		TaskDb:        taskDB,
+		EventDb:       eventDB,
+		Workers:       workers,
+		WorkerTaskMap: workerTaskMap,
 		TaskWorkerMap: taskWorkerMap,
 	}
 }
 
 func (m *Manager) SelectWorker() string {
-	var newWorker int 
+	var newWorker int
 
-	if m.LastWorker + 1 < len(m.Workers) {
+	if m.LastWorker+1 < len(m.Workers) {
 		newWorker = m.LastWorker + 1
 		m.LastWorker++
 	} else {
@@ -63,7 +63,7 @@ func (m *Manager) SendWork() {
 
 	if m.Pending.Len() > 0 {
 		chosenWorker := m.SelectWorker()
-		
+
 		e := m.Pending.Dequeue()
 		te := e.(task.Event)
 		t := te.Task
@@ -74,8 +74,8 @@ func (m *Manager) SendWork() {
 		m.WorkerTaskMap[chosenWorker] = append(m.WorkerTaskMap[chosenWorker], te.Task.UUID)
 		m.TaskWorkerMap[t.UUID] = chosenWorker
 
-		task.StateScheduled(t)
-		m.TaskDb[t.UUID] = &t 
+		task.StateScheduled(&t)
+		m.TaskDb[t.UUID] = &t
 
 		data, err := json.Marshal(te)
 		if err != nil {
@@ -95,7 +95,7 @@ func (m *Manager) SendWork() {
 		defer resp.Body.Close()
 
 		if resp.StatusCode != http.StatusCreated {
-			body, _ := io.ReadAll(resp.Body)	
+			body, _ := io.ReadAll(resp.Body)
 			log.Printf("%v: Response error (%v): %s\n", op, resp.StatusCode, string(body))
 			return
 		}
@@ -105,7 +105,7 @@ func (m *Manager) SendWork() {
 			log.Printf("%v: Error reading response body: %v\n", op, err)
 			return
 		}
-			
+
 		log.Printf("%v: Worker accepted task %v. Response: %s\n", op, t.UUID, string(body))
 		log.Printf("%#v\n", t)
 	} else {
@@ -113,17 +113,17 @@ func (m *Manager) SendWork() {
 	}
 }
 
-func (m *Manager)updateTasks() {
+func (m *Manager) updateTasks() {
 	op := "manager.updateTasks"
 
 	for _, worker := range m.Workers {
 		log.Printf("Checking worker %v for the task update\n", worker)
 		url := fmt.Sprintf("http://%s/tasks", worker)
 
-		resp, err := http.Get(url) 
+		resp, err := http.Get(url)
 		if err != nil {
 			log.Printf("%v: Error connecting to worker %v: %v\n", op, worker, err)
-		}	
+		}
 
 		if resp.StatusCode != http.StatusOK {
 			log.Printf("%v: Error sengind request: %v\n", op, err)
@@ -138,15 +138,15 @@ func (m *Manager)updateTasks() {
 
 		for _, t := range tasks {
 			log.Printf("Attemting to update the task: %v\n", t.UUID)
-			
+
 			_, ok := m.TaskDb[t.UUID]
 			if !ok {
 				log.Printf("%v: Task with UUID %v not found", op, t.UUID)
-				return 
+				return
 			}
 
 			if m.TaskDb[t.UUID].State != t.State {
-				m.TaskDb[t.UUID].State = t.State 
+				m.TaskDb[t.UUID].State = t.State
 			}
 
 			m.TaskDb[t.UUID].StartTime = t.StartTime
@@ -156,10 +156,10 @@ func (m *Manager)updateTasks() {
 	}
 }
 
-func (m *Manager)UpdateTasks() {
+func (m *Manager) UpdateTasks() {
 	for {
 		log.Println("Checking for task updates from workers")
-		
+
 		m.updateTasks()
 		log.Println("Task updates completed")
 
@@ -170,17 +170,17 @@ func (m *Manager)UpdateTasks() {
 	}
 }
 
-func (m *Manager)AddTask(te task.Event) {
+func (m *Manager) AddTask(te task.Event) {
 	m.Pending.Enqueue(te)
 }
 
-func (m *Manager)GetTasks() []*task.Task {
-	tasks := []*task.Task{} 
+func (m *Manager) GetTasks() []*task.Task {
+	tasks := []*task.Task{}
 	for _, t := range m.TaskDb {
 		tasks = append(tasks, t)
 	}
 
-	return tasks 
+	return tasks
 }
 
 func (m *Manager) ProcessTasks() {
