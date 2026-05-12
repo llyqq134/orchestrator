@@ -115,7 +115,7 @@ func (m *Manager) SendWork() {
 			return
 		}
 
-		log.Printf(op+"slected worker %v for task %v\n", w.Name, t.UUID)
+		log.Printf(op+"selected worker %v for task %v\n", w.Name, t.UUID)
 
 		m.TaskWorkerMap[t.UUID] = w.Name
 		task.StateScheduled(&t)
@@ -247,9 +247,32 @@ func (m *Manager) AddTask(te task.Event) {
 }
 
 func (m *Manager) GetTasks() []*task.Task {
+	op := "[manager.GetTasks]: "
+
 	tasks := []*task.Task{}
-	for _, t := range m.TaskDb {
-		tasks = append(tasks, t)
+	for _, w := range m.Workers {
+		url := fmt.Sprintf("http://%v/tasks", w)
+		resp, err := http.Get(url)
+		if err != nil {
+			log.Printf(op+"Error connecting to %v: %v", w, err)
+			continue
+		}
+
+		if resp.StatusCode != http.StatusOK {
+			body, _ := io.ReadAll(resp.Body)
+			log.Printf(op+"Response error (%v): %s\n", resp.StatusCode, string(body))
+			continue
+		}
+
+		var workerTasks []*task.Task
+		if err := json.NewDecoder(resp.Body).Decode(&workerTasks); err != nil {
+			log.Printf(op+"Error decoding response body: %v\n", err)
+			resp.Body.Close()
+			continue
+		}
+		resp.Body.Close()
+
+		tasks = append(tasks, workerTasks...)
 	}
 
 	return tasks
