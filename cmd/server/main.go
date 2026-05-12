@@ -3,10 +3,12 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
 	"orchestrator/config"
 	"orchestrator/pkg/resources/manager"
+	"orchestrator/pkg/resources/scheduler"
 	"orchestrator/pkg/resources/task"
 	"orchestrator/pkg/resources/worker"
 
@@ -16,36 +18,63 @@ import (
 	"github.com/ilyakaznacheev/cleanenv"
 )
 
+const (
+	workersCount = 3
+)
+
 func main() {
-	workerRouter := gin.Default()
 	managerRouter := gin.Default()
 
 	var cfg config.Config
 
-	err := cleanenv.ReadConfig("./../../config/server.yaml", &cfg)
-	if err != nil {
+	if err := cleanenv.ReadConfig("./../../config/server.yaml", &cfg); err != nil {
 		panic(err)
 	}
 
-	w := worker.Worker{
-		Queue: *queue.New(),
-		Db:    make(map[uuid.UUID]*task.Task),
+	basePort, err := strconv.Atoi(cfg.Worker.Port)
+	if err != nil {
+		panic(fmt.Errorf("invalid worker port: %w", err))
 	}
 
-	workers := []string{
-		fmt.Sprintf("%v:%v", cfg.Worker.Host, cfg.Worker.Port),
+	workers := make([]*worker.Worker, workersCount)
+	workerAddrs := make([]string, workersCount)
+
+	for i := range workersCount {
+		w := &worker.Worker{
+			Queue: *queue.New(),
+			Db:    make(map[uuid.UUID]*task.Task),
+		}
+		workers[i] = w
+
+		addr := fmt.Sprintf("%s:%d", cfg.Worker.Host, basePort+i)
+		workerAddrs[i] = addr
+
+		r := gin.Default()
+		wapi := worker.Api{
+			Host:   cfg.Worker.Host,
+			Port:   strconv.Itoa(basePort + i),
+			Worker: w,
+			Router: r,
+		}
+		wapi.Register()
+
+		go func() {
+			if err := r.Run(addr); err != nil {
+				panic(err)
+			}
+		}()
 	}
 
-	m := manager.New(workers)
-
-	workerApi := worker.Api{
-		Host:   cfg.Worker.Host,
-		Port:   cfg.Worker.Port,
-		Worker: &w,
-		Router: workerRouter,
+	for _, addr := range workerAddrs {
+		waitForServer("http://" + addr + "/health")
 	}
 
-	workerApi.Register()
+	for _, w := range workers {
+		go w.RunTasks()
+		go w.CollectStats()
+	}
+
+	m := manager.New(workerAddrs, scheduler.EpvmScheduler)
 
 	managerApi := manager.Api{
 		Host:    cfg.Manager.Host,
@@ -53,35 +82,13 @@ func main() {
 		Manager: m,
 		Router:  managerRouter,
 	}
-
 	managerApi.Register()
 
-	workerAddr := fmt.Sprintf(
-		"%v:%v",
-		cfg.Worker.Host,
-		cfg.Worker.Port,
-	)
-
-	go func() {
-		if err := workerRouter.Run(workerAddr); err != nil {
-			panic(err)
-		}
-	}()
-
-	waitForServer("http://" + workerAddr + "/health")
-
-	go w.RunTasks()
-	go w.CollectStats()
 	go m.ProcessTasks()
 	go m.UpdateTasks()
 	go m.DoTaskHealthCheck()
 
-	managerAddr := fmt.Sprintf(
-		"%v:%v",
-		cfg.Manager.Host,
-		cfg.Manager.Port,
-	)
-
+	managerAddr := fmt.Sprintf("%s:%s", cfg.Manager.Host, cfg.Manager.Port)
 	if err := managerRouter.Run(managerAddr); err != nil {
 		panic(err)
 	}
