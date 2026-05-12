@@ -66,10 +66,12 @@ func New(workers []string, schedulerType string) *Manager {
 }
 
 func (m *Manager) SelectWorker(t task.Task) (*node.Node, error) {
+	op := "[manager.SelectWorker]: "
+
 	candidates := m.Scheduler.SelectCandidateNodes(t, m.WorkerNodes)
-	if candidates == nil || len(candidates) == 0 {
+	if candidates == nil {
 		msg := fmt.Sprintf("No candidate workers found for task %v", t.UUID)
-		log.Println("[manager.SelectWorker]: " + msg)
+		log.Println(op + msg)
 
 		err := errors.New(msg)
 		return nil, err
@@ -120,14 +122,14 @@ func (m *Manager) SendWork() {
 
 		data, err := json.Marshal(te)
 		if err != nil {
-			log.Printf(op+"%v: Unable to marshal task object: %v\n", op, t)
+			log.Printf(op+"Unable to marshal task object: %v\n", t)
 		}
 
 		url := fmt.Sprintf("http://%s/tasks", w.Name)
 
 		resp, err := http.Post(url, "application/json", bytes.NewBuffer(data))
 		if err != nil {
-			log.Printf(op+"%v: Error connecting to %v: %v\n", op, w.Name, err)
+			log.Printf(op+"Error connecting to %v: %v\n", w.Name, err)
 			m.Pending.Enqueue(te)
 
 			return
@@ -137,20 +139,20 @@ func (m *Manager) SendWork() {
 
 		if resp.StatusCode != http.StatusCreated {
 			body, _ := io.ReadAll(resp.Body)
-			log.Printf(op+"%v: Response error (%v): %s\n", op, resp.StatusCode, string(body))
+			log.Printf(op+"Response error (%v): %s\n", resp.StatusCode, string(body))
 			return
 		}
 
 		body, err := io.ReadAll(resp.Body)
 		if err != nil {
-			log.Printf(op+"%v: Error reading response body: %v\n", op, err)
+			log.Printf(op+"Error reading response body: %v\n", err)
 			return
 		}
 
-		log.Printf(op+"%v: Worker accepted task %v. Response: %s\n", op, t.UUID, string(body))
+		log.Printf(op+"Worker accepted task %v. Response: %s\n", t.UUID, string(body))
 		log.Printf(op+"%#v\n", t)
 	} else {
-		log.Println("No work in the queue")
+		log.Println(op + "No work in the queue")
 	}
 }
 
@@ -185,23 +187,23 @@ func (m *Manager) updateTasks() {
 	op := "[manager.updateTasks]: "
 
 	for _, worker := range m.Workers {
-		log.Printf("Checking worker %v for the task update\n", worker)
+		log.Printf(op+"Checking worker %v for the task update\n", worker)
 		url := fmt.Sprintf("http://%s/tasks", worker)
 
 		resp, err := http.Get(url)
 		if err != nil {
-			log.Printf("%v: Error connecting to worker %v: %v\n", op, worker, err)
+			log.Printf(op+"Error connecting to worker %v: %v\n", worker, err)
 		}
 
 		if resp.StatusCode != http.StatusOK {
-			log.Printf("%v: Error sengind request: %v\n", op, err)
+			log.Printf(op+"Error sengind request: %v\n", err)
 		}
 
 		d := json.NewDecoder(resp.Body)
 		var tasks []*task.Task
 
 		if err := d.Decode(&tasks); err != nil {
-			log.Printf("%v: Error unmarshalling tasks: %s\n", op, err.Error())
+			log.Printf(op+"Error unmarshalling tasks: %s\n", err.Error())
 		}
 
 		for _, t := range tasks {
@@ -209,7 +211,7 @@ func (m *Manager) updateTasks() {
 
 			_, ok := m.TaskDb[t.UUID]
 			if !ok {
-				log.Printf("%v: Task with UUID %v not found", op, t.UUID)
+				log.Printf(op+"Task with UUID %v not found", t.UUID)
 				return
 			}
 
@@ -225,14 +227,16 @@ func (m *Manager) updateTasks() {
 }
 
 func (m *Manager) UpdateTasks() {
+	op := "[manager.UpdateTasks]: "
+
 	for {
-		log.Println("Checking for task updates from workers")
+		log.Println(op + "Checking for task updates from workers")
 
 		m.updateTasks()
-		log.Println("Task updates completed")
+		log.Println(op + "Task updates completed")
 
 		timeToSleep := 10
-		log.Printf("Sleeping for %v seconds", timeToSleep)
+		log.Printf(op+"Sleeping for %v seconds", timeToSleep)
 
 		time.Sleep(time.Duration(timeToSleep) * time.Second)
 	}
@@ -252,12 +256,13 @@ func (m *Manager) GetTasks() []*task.Task {
 }
 
 func (m *Manager) ProcessTasks() {
+	op := "[manager.ProcessTasks]: "
 	for {
-		log.Println("Processing any tasks in the queue")
+		log.Println(op + "Processing any tasks in the queue")
 
 		m.SendWork()
 		timeToSleep := 10
-		log.Printf("Sleeping for %v seconds", timeToSleep)
+		log.Printf(op+"Sleeping for %v seconds", timeToSleep)
 
 		time.Sleep(time.Duration(timeToSleep) * time.Second)
 	}
@@ -265,6 +270,7 @@ func (m *Manager) ProcessTasks() {
 
 func (m *Manager) checkTaskHealth(t task.Task) error {
 	op := "[manager.checkTaskHealth]: "
+
 	log.Printf(op+"Calling health check for task %s: %s\n", t.UUID, t.HealthCheck)
 
 	w := m.TaskWorkerMap[t.UUID]
@@ -350,7 +356,7 @@ func (m *Manager) restartTask(t *task.Task) {
 
 	newTask := task.Task{}
 	if err = d.Decode(&newTask); err != nil {
-		log.Printf("%v: Error decoding response body: %v\n", op, err.Error())
+		log.Printf(op+"Error decoding response body: %v\n", err.Error())
 		return
 	}
 
