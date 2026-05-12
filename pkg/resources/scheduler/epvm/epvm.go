@@ -1,13 +1,8 @@
 package epvm
 
 import (
-	"encoding/json"
-	"fmt"
-	"io"
 	"log"
 	"math"
-	"net/http"
-	"orchestrator/pkg/metrics"
 	"orchestrator/pkg/resources/node"
 	"orchestrator/pkg/resources/task"
 	"time"
@@ -40,11 +35,18 @@ func checkDisk(t task.Task, diskAvailable int) bool {
 }
 
 func (e *Epvm) Score(t task.Task, nodes []*node.Node) map[string]float64 {
+	op := "[epvm.Score]: "
+
 	nodeScores := make(map[string]float64)
 	maxJobs := 4.0
 
 	for _, node := range nodes {
-		cpuUsage := calculateCpuUsage(node)
+		cpuUsage, err := calculateCpuUsage(node)
+		if err != nil {
+			log.Println(op+"Error calculating CPU usage for node %s, skipping: %v", node.Name, err)
+			continue
+		}
+
 		cpuLoad := calculateLoad(*cpuUsage, math.Pow(2, 0.8))
 
 		memoryAllocated := float64(node.Stats.MemUsedKb()) + float64(node.MemoryAllocated)
@@ -87,10 +89,18 @@ func (e *Epvm) Pick(scores map[string]float64, candidates []*node.Node) *node.No
 	return bestNode
 }
 
-func calculateCpuUsage(node *node.Node) *float64 {
-	stat1 := getNodeStats(node)
+func calculateCpuUsage(node *node.Node) (*float64, error) {
+	stat1, err := node.GetStats()
+	if err != nil {
+		return nil, err
+	}
+
 	time.Sleep(3 * time.Second)
-	stat2 := getNodeStats(node)
+
+	stat2, err := node.GetStats()
+	if err != nil {
+		return nil, err
+	}
 
 	stat1Idle := stat1.CpuStats.Idle + stat1.CpuStats.IOWait
 	stat2Idle := stat2.CpuStats.Idle + stat2.CpuStats.IOWait
@@ -115,29 +125,7 @@ func calculateCpuUsage(node *node.Node) *float64 {
 		cpuPercentUsage = (float64(total) - float64(idle)) / float64(total)
 	}
 
-	return &cpuPercentUsage
-}
-
-func getNodeStats(node *node.Node) *metrics.Stats {
-	op := "[epvm.getNodeStats]: "
-
-	url := fmt.Sprintf("http://%s/stats", node.Api)
-	resp, err := http.Get(url)
-	if err != nil {
-		log.Printf(op+"Error connecting to %v: %v", node.Api, err)
-	}
-
-	if resp.StatusCode != 200 {
-		log.Printf(op+"Error retrieving stats from %v: %v", node.Api, err)
-	}
-
-	defer resp.Body.Close()
-	body, _ := io.ReadAll(resp.Body)
-
-	var stats metrics.Stats
-	json.Unmarshal(body, &stats)
-
-	return &stats
+	return &cpuPercentUsage, nil
 }
 
 func calculateLoad(usage float64, capacity float64) float64 {
