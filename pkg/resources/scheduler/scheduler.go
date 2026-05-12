@@ -8,6 +8,7 @@ import (
 
 const (
 	RoundRobinScheduler = "roundRobin"
+	EpvmScheduler       = "epvm"
 )
 
 type Scheduler interface {
