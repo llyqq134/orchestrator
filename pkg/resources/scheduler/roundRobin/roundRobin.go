@@ -1,4 +1,4 @@
-package scheduler
+package roundrobin
 
 import (
 	"orchestrator/pkg/resources/node"
