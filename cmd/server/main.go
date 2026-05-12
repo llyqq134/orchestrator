@@ -22,7 +22,7 @@ func main() {
 
 	var cfg config.Config
 
-	err := cleanenv.ReadConfig("../../config/server.yaml", &cfg)
+	err := cleanenv.ReadConfig("./../../config/server.yaml", &cfg)
 	if err != nil {
 		panic(err)
 	}

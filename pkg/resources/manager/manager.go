@@ -8,6 +8,8 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"orchestrator/pkg/resources/node"
+	"orchestrator/pkg/resources/scheduler"
 	"orchestrator/pkg/resources/task"
 	"strings"
 	"time"
@@ -24,16 +26,31 @@ type Manager struct {
 	WorkerTaskMap map[string][]uuid.UUID
 	TaskWorkerMap map[uuid.UUID]string
 	LastWorker    int
+	WorkerNodes   []*node.Node
+	Scheduler     scheduler.SchedulerType
 }
 
-func New(workers []string) *Manager {
+func New(workers []string, schedulerType string) *Manager {
 	taskDB := make(map[uuid.UUID]*task.Task)
 	eventDB := make(map[uuid.UUID]*task.Event)
 	workerTaskMap := make(map[string][]uuid.UUID)
 	taskWorkerMap := make(map[uuid.UUID]string)
 
+	var nodes []*node.Node
 	for worker := range workers {
 		workerTaskMap[workers[worker]] = []uuid.UUID{}
+
+		nAPI := fmt.Sprintf("http://%v", workers[worker])
+		n := node.New(workers[worker], nAPI, "worker")
+		nodes = append(nodes, n)
+	}
+
+	var s scheduler.SchedulerType
+	switch schedulerType {
+	case "roundRobin":
+		s = &scheduler.SchedulerType.RoundRobin{Name: "roundRobin"}
+	default:
+		s = &scheduler.RoundRobin{Name: "roundRobin"}
 	}
 
 	return &Manager{
@@ -43,6 +60,8 @@ func New(workers []string) *Manager {
 		Workers:       workers,
 		WorkerTaskMap: workerTaskMap,
 		TaskWorkerMap: taskWorkerMap,
+		WorkerNodes:   nodes,
+		Scheduler:     s,
 	}
 }
 
