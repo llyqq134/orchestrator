@@ -34,6 +34,9 @@ go.work.sum
 # json
 *.json
 
+# bd files
+*.db
+
 # Editor/IDE
 # .idea/
 # .vscode/
