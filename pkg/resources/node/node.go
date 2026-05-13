@@ -36,7 +36,7 @@ func New(name, api, role string) *Node {
 func (n *Node) GetStats() (*metrics.Stats, error) {
 	op := "[node.GetStats]: "
 
-	url := fmt.Sprintf("http://%s/stats", n.Api)
+	url := fmt.Sprintf("%s/stats", n.Api)
 	resp, err := utils.HTTPWithRetry(http.Get, url)
 	if err != nil {
 		msg := fmt.Sprintf("Unable to connect to %v. Permanent failure", n.Api)
@@ -62,6 +62,11 @@ func (n *Node) GetStats() (*metrics.Stats, error) {
 
 		return nil, err
 	}
+
+	n.Stats = stats
+	n.Memory = int(stats.MemTotalKb()) * 1024
+	n.Disk = int(stats.DiskTotal())
+	n.TaskCount = stats.TaskCount
 
 	return &n.Stats, nil
 }

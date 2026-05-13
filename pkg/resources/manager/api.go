@@ -13,6 +13,7 @@ import (
 
 const (
 	healthURL = "/health" //GET
+	nodesURL  = "/nodes"  //GET
 )
 
 const (
@@ -44,6 +45,14 @@ func (a *Api) Register() {
 		tasks.DELETE(deleteTaskURL, a.DeleteTaskHandler)
 	}
 	a.Router.GET(healthURL, a.GetHealth)
+	a.Router.GET(nodesURL, a.GetNodesHandler)
+}
+
+func (a *Api) GetNodesHandler(c *gin.Context) {
+	for _, n := range a.Manager.WorkerNodes {
+		n.GetStats()
+	}
+	c.JSON(200, a.Manager.WorkerNodes)
 }
 
 func (a *Api) GetHealth(c *gin.Context) {

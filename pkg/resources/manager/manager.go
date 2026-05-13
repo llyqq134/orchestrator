@@ -160,6 +160,7 @@ func (m *Manager) SendWork() {
 
 		m.TaskWorkerMap[t.UUID] = w.Name
 		task.StateScheduled(&t)
+		te.Task = t
 
 		data, err := json.Marshal(te)
 		if err != nil {
@@ -426,6 +427,11 @@ func (m *Manager) restartTask(t *task.Task) {
 	op := "[manager.restartTask]: "
 
 	w := m.TaskWorkerMap[t.UUID]
+	if w == "" {
+		log.Printf(op+"No worker found for task %v, skipping restart\n", t.UUID)
+		return
+	}
+
 	t.State = task.Scheduled
 	t.RestartCount++
 	m.TaskDb.Put(t.UUID.String(), t)
@@ -448,11 +454,10 @@ func (m *Manager) restartTask(t *task.Task) {
 	if err != nil {
 		log.Printf(op+"Error connecting to %v: %v\n", w, err)
 		m.Pending.Enqueue(t)
+		return
 	}
-
 	defer resp.Body.Close()
 
-	d := json.NewDecoder(resp.Body)
 	if resp.StatusCode != http.StatusCreated {
 		body, _ := io.ReadAll(resp.Body)
 		log.Printf(op+"Response error (%v): %s\n", resp.StatusCode, string(body))
@@ -460,7 +465,7 @@ func (m *Manager) restartTask(t *task.Task) {
 	}
 
 	newTask := task.Task{}
-	if err = d.Decode(&newTask); err != nil {
+	if err = json.NewDecoder(resp.Body).Decode(&newTask); err != nil {
 		log.Printf(op+"Error decoding response body: %v\n", err.Error())
 		return
 	}
