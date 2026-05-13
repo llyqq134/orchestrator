@@ -135,13 +135,18 @@ func (a *Api) DeleteTaskHandler(c *gin.Context) {
 		return
 	}
 
-	taskToDelete, ok := a.Manager.TaskDb[taskUUID]
-	if !ok {
+	result, err := a.Manager.TaskDb.Get(taskUUID.String())
+	if err != nil {
 		log.Printf(op+"No task with UUID: %v\n", taskUUID)
 		c.JSON(404, gin.H{
 			"statusCode": 404,
 			"Message":    "No task with this UUID",
 		})
+	}
+
+	taskToDelete, ok := result.(*task.Task)
+	if !ok {
+		log.Printf(op+"Cannot convert result to task.Task type: %v\n", err)
 	}
 
 	te := task.Event{
