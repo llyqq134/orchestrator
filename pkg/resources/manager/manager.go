@@ -175,6 +175,11 @@ func (m *Manager) SendWork() {
 			return
 		}
 
+		if err := m.TaskDb.Put(t.UUID.String(), &t); err != nil {
+			log.Printf(op+"Error storing task %v in db: %v\n", t.UUID, err)
+			return
+		}
+
 		log.Printf(op+"Worker accepted task %v. Response: %s\n", t.UUID, string(body))
 		log.Printf(op+"%#v\n", t)
 	} else {
@@ -206,7 +211,24 @@ func (m *Manager) stopTask(worker string, taskId string) {
 		return
 	}
 
-	log.Printf(op+"task %s has been scheduled to be stopped\n", taskId)
+	result, err := m.TaskDb.Get(taskId)
+	if err != nil {
+		log.Printf(op+"Error getting task %s from db: %v\n", taskId, err)
+		return
+	}
+
+	t, ok := result.(*task.Task)
+	if !ok {
+		log.Println(op + "Cannot convert result to task.Task type\n")
+		return
+	}
+
+	task.StateCompleted(t)
+	if err := m.TaskDb.Put(taskId, t); err != nil {
+		log.Printf(op+"Error updating task %s in db: %v\n", taskId, err)
+	}
+
+	log.Printf(op+"task %s has been stopped\n", taskId)
 }
 
 func (m *Manager) updateTasks() {

@@ -142,11 +142,15 @@ func (a *Api) DeleteTaskHandler(c *gin.Context) {
 			"statusCode": 404,
 			"Message":    "No task with this UUID",
 		})
+
+		return
 	}
 
 	taskToDelete, ok := result.(*task.Task)
 	if !ok {
 		log.Printf(op+"Cannot convert result to task.Task type: %v\n", err)
+		c.JSON(500, gin.H{"Message": "Internal server error"})
+		return
 	}
 
 	te := task.Event{
