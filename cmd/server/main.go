@@ -9,12 +9,11 @@ import (
 	"orchestrator/config"
 	"orchestrator/pkg/resources/manager"
 	"orchestrator/pkg/resources/scheduler"
-	"orchestrator/pkg/resources/task"
 	"orchestrator/pkg/resources/worker"
+	"orchestrator/pkg/store"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-collections/collections/queue"
-	"github.com/google/uuid"
 	"github.com/ilyakaznacheev/cleanenv"
 )
 
@@ -42,7 +41,7 @@ func main() {
 	for i := range workersCount {
 		w := &worker.Worker{
 			Queue: *queue.New(),
-			Db:    make(map[uuid.UUID]*task.Task),
+			Db:    store.NewTaskStore(),
 		}
 		workers[i] = w
 
@@ -74,7 +73,7 @@ func main() {
 		go w.CollectStats()
 	}
 
-	m := manager.New(workerAddrs, scheduler.EpvmScheduler)
+	m := manager.New(workerAddrs, scheduler.EpvmScheduler, "memory")
 
 	managerApi := manager.Api{
 		Host:    cfg.Manager.Host,
