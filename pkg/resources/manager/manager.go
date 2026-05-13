@@ -11,6 +11,7 @@ import (
 	"orchestrator/pkg/resources/node"
 	"orchestrator/pkg/resources/scheduler"
 	"orchestrator/pkg/resources/task"
+	"orchestrator/pkg/store"
 	"strings"
 	"time"
 
@@ -20,8 +21,8 @@ import (
 
 type Manager struct {
 	Pending       queue.Queue
-	TaskDb        map[uuid.UUID]*task.Task
-	EventDb       map[uuid.UUID]*task.Event
+	TaskDb        store.Store
+	EventDb       store.Store
 	Workers       []string
 	WorkerTaskMap map[string][]uuid.UUID
 	TaskWorkerMap map[uuid.UUID]string
@@ -30,9 +31,7 @@ type Manager struct {
 	Scheduler     scheduler.Scheduler
 }
 
-func New(workers []string, schedulerType string) *Manager {
-	taskDB := make(map[uuid.UUID]*task.Task)
-	eventDB := make(map[uuid.UUID]*task.Event)
+func New(workers []string, schedulerType, dbType string) *Manager {
 	workerTaskMap := make(map[string][]uuid.UUID)
 	taskWorkerMap := make(map[uuid.UUID]string)
 
@@ -53,16 +52,28 @@ func New(workers []string, schedulerType string) *Manager {
 		s = scheduler.New(scheduler.RoundRobinScheduler)
 	}
 
-	return &Manager{
+	m := Manager{
 		Pending:       *queue.New(),
-		TaskDb:        taskDB,
-		EventDb:       eventDB,
 		Workers:       workers,
 		WorkerTaskMap: workerTaskMap,
 		TaskWorkerMap: taskWorkerMap,
 		WorkerNodes:   nodes,
 		Scheduler:     s,
 	}
+
+	var ts store.Store
+	var es store.Store
+
+	switch dbType {
+	case "memory":
+		ts = store.NewTaskStore()
+		es = store.NewTaskEventStore()
+	}
+
+	m.TaskDb = ts
+	m.EventDb = es
+
+	return &m
 }
 
 func (m *Manager) SelectWorker(t task.Task) (*node.Node, error) {
@@ -89,13 +100,28 @@ func (m *Manager) SendWork() {
 	if m.Pending.Len() > 0 {
 		e := m.Pending.Dequeue()
 		te := e.(task.Event)
-		m.EventDb[te.UUID] = &te
+		err := m.EventDb.Put(te.UUID.String(), &te)
+		if err != nil {
+			log.Printf(op+"Error attempting to store task event %s: %s\n", te.UUID.String(), err)
+			return
+		}
 
 		log.Printf(op+"Pulled %v off pending queue\n", te)
 
 		taskWorker, ok := m.TaskWorkerMap[te.Task.UUID]
 		if ok {
-			persistedTask := m.TaskDb[te.Task.UUID]
+			result, err := m.TaskDb.Get(te.Task.UUID.String())
+			if err != nil {
+				log.Printf(op+"Unable to schedule task: %s\n", err)
+				return
+			}
+
+			persistedTask, ok := result.(*task.Task)
+			if !ok {
+				log.Println(op+"Cannot convert result to task.Task type: %v\n", err)
+				return
+			}
+
 			if te.State == task.Completed && task.ValidateTransition(persistedTask.State, te.State) {
 				m.stopTask(taskWorker, te.Task.UUID.String())
 				return
@@ -209,19 +235,28 @@ func (m *Manager) updateTasks() {
 		for _, t := range tasks {
 			log.Printf("Attemting to update the task: %v\n", t.UUID)
 
-			_, ok := m.TaskDb[t.UUID]
-			if !ok {
+			result, err := m.TaskDb.Get(t.UUID.String())
+			if err != nil {
 				log.Printf(op+"Task with UUID %v not found", t.UUID)
-				return
+				continue
 			}
 
-			if m.TaskDb[t.UUID].State != t.State {
-				m.TaskDb[t.UUID].State = t.State
+			taskPersisted, ok := result.(*task.Task)
+			if !ok {
+				log.Printf(op+"cannot convert result %v to task.Task type\n", result)
+				continue
 			}
 
-			m.TaskDb[t.UUID].StartTime = t.StartTime
-			m.TaskDb[t.UUID].FinishTime = t.FinishTime
-			m.TaskDb[t.UUID].ContainerID = t.ContainerID
+			if taskPersisted.State != t.State {
+				taskPersisted.State = t.State
+			}
+
+			taskPersisted.StartTime = t.StartTime
+			taskPersisted.FinishTime = t.FinishTime
+			taskPersisted.ContainerID = t.ContainerID
+			taskPersisted.HostPorts = t.HostPorts
+
+			m.TaskDb.Put(taskPersisted.UUID.String(), taskPersisted)
 		}
 	}
 }
@@ -249,33 +284,43 @@ func (m *Manager) AddTask(te task.Event) {
 func (m *Manager) GetTasks() []*task.Task {
 	op := "[manager.GetTasks]: "
 
-	tasks := []*task.Task{}
-	for _, w := range m.Workers {
-		url := fmt.Sprintf("http://%v/tasks", w)
-		resp, err := http.Get(url)
-		if err != nil {
-			log.Printf(op+"Error connecting to %v: %v", w, err)
-			continue
-		}
+	/*
+		tasks := []*task.Task{}
+		for _, w := range m.Workers {
+			url := fmt.Sprintf("http://%v/tasks", w)
+			resp, err := http.Get(url)
+			if err != nil {
+				log.Printf(op+"Error connecting to %v: %v", w, err)
+				continue
+			}
 
-		if resp.StatusCode != http.StatusOK {
-			body, _ := io.ReadAll(resp.Body)
-			log.Printf(op+"Response error (%v): %s\n", resp.StatusCode, string(body))
-			continue
-		}
+			if resp.StatusCode != http.StatusOK {
+				body, _ := io.ReadAll(resp.Body)
+				log.Printf(op+"Response error (%v): %s\n", resp.StatusCode, string(body))
+				continue
+			}
 
-		var workerTasks []*task.Task
-		if err := json.NewDecoder(resp.Body).Decode(&workerTasks); err != nil {
-			log.Printf(op+"Error decoding response body: %v\n", err)
+			var workerTasks []*task.Task
+			if err := json.NewDecoder(resp.Body).Decode(&workerTasks); err != nil {
+				log.Printf(op+"Error decoding response body: %v\n", err)
+				resp.Body.Close()
+				continue
+			}
 			resp.Body.Close()
-			continue
-		}
-		resp.Body.Close()
 
-		tasks = append(tasks, workerTasks...)
+			tasks = append(tasks, workerTasks...)
+		}
+
+		return tasks
+	*/
+
+	taskList, err := m.TaskDb.List()
+	if err != nil {
+		log.Printf(op+"Error getting list of tasks: %v\n", err)
+		return nil
 	}
 
-	return tasks
+	return taskList.([]*task.Task)
 }
 
 func (m *Manager) ProcessTasks() {
@@ -346,7 +391,7 @@ func (m *Manager) restartTask(t *task.Task) {
 	w := m.TaskWorkerMap[t.UUID]
 	t.State = task.Scheduled
 	t.RestartCount++
-	m.TaskDb[t.UUID] = t
+	m.TaskDb.Put(t.UUID.String(), t)
 
 	te := task.Event{
 		UUID:      uuid.New(),
