@@ -8,12 +8,14 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"path/filepath"
+	"strings"
+	"time"
+
 	"orchestrator/pkg/resources/node"
 	"orchestrator/pkg/resources/scheduler"
 	"orchestrator/pkg/resources/task"
 	"orchestrator/pkg/store"
-	"strings"
-	"time"
 
 	"github.com/golang-collections/collections/queue"
 	"github.com/google/uuid"
@@ -31,7 +33,9 @@ type Manager struct {
 	Scheduler     scheduler.Scheduler
 }
 
-func New(workers []string, schedulerType, dbType string) *Manager {
+func New(workers []string, schedulerType, dbType, dataDir string) *Manager {
+	op := "[Manager.New]: "
+
 	workerTaskMap := make(map[string][]uuid.UUID)
 	taskWorkerMap := make(map[uuid.UUID]string)
 
@@ -63,9 +67,20 @@ func New(workers []string, schedulerType, dbType string) *Manager {
 
 	var ts store.Store
 	var es store.Store
+	var err error
 
 	switch dbType {
-	case "memory":
+	case store.PersistentStore:
+		ts, err = store.NewTaskStore(filepath.Join(dataDir, "tasks.db"), 0600, "tasks")
+		if err != nil {
+			log.Fatalf(op+"unable to create task store: %v", err)
+		}
+
+		es, err = store.NewEventStore(filepath.Join(dataDir, "events.db"), 0600, "events")
+		if err != nil {
+			log.Fatalf(op+"unable to create task event store: %v", err)
+		}
+	default:
 		ts = store.NewInMemoryTaskStore()
 		es = store.NewInMemoryTaskEventStore()
 	}

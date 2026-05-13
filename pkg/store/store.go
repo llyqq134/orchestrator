@@ -1,5 +1,10 @@
 package store
 
+const (
+	MemoryStore     = "memory"
+	PersistentStore = "persistent"
+)
+
 type Store interface {
 	Put(key string, value any) error
 	Get(key string) (any, error)

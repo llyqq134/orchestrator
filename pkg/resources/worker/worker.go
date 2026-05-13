@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"path/filepath"
 	"time"
 
 	"orchestrator/pkg/docker"
@@ -22,16 +23,27 @@ type Worker struct {
 	Stats     *metrics.Stats
 }
 
-func New(name, taskDbType string) *Worker {
+func New(name, taskDbType, dataDir string) *Worker {
+	op := "[worker.New]: "
+
 	w := Worker{
 		Name:  name,
 		Queue: *queue.New(),
 	}
 
 	var s store.Store
+	var err error
+
 	switch taskDbType {
-	case "memory":
+	case store.PersistentStore:
+		filename := filepath.Join(dataDir, fmt.Sprintf("%s_tasks.db", name))
+		s, err = store.NewTaskStore(filename, 0600, "tasks")
+	default:
 		s = store.NewInMemoryTaskStore()
+	}
+
+	if err != nil {
+		log.Fatalf(op+"unable to create task store: %v", err)
 	}
 
 	w.Db = s

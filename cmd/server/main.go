@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"os"
 	"strconv"
 	"time"
 
@@ -13,7 +14,6 @@ import (
 	"orchestrator/pkg/store"
 
 	"github.com/gin-gonic/gin"
-	"github.com/golang-collections/collections/queue"
 	"github.com/ilyakaznacheev/cleanenv"
 )
 
@@ -30,6 +30,10 @@ func main() {
 		panic(err)
 	}
 
+	if err := os.MkdirAll(cfg.DataDir, 0755); err != nil {
+		panic(fmt.Errorf("failed to create data directory: %w", err))
+	}
+
 	basePort, err := strconv.Atoi(cfg.Worker.Port)
 	if err != nil {
 		panic(fmt.Errorf("invalid worker port: %w", err))
@@ -39,14 +43,11 @@ func main() {
 	workerAddrs := make([]string, workersCount)
 
 	for i := range workersCount {
-		w := &worker.Worker{
-			Queue: *queue.New(),
-			Db:    store.NewInMemoryTaskStore(),
-		}
-		workers[i] = w
-
 		addr := fmt.Sprintf("%s:%d", cfg.Worker.Host, basePort+i)
 		workerAddrs[i] = addr
+
+		w := worker.New(addr, store.PersistentStore, cfg.DataDir)
+		workers[i] = w
 
 		r := gin.Default()
 		wapi := worker.Api{
@@ -73,7 +74,7 @@ func main() {
 		go w.CollectStats()
 	}
 
-	m := manager.New(workerAddrs, scheduler.EpvmScheduler, "memory")
+	m := manager.New(workerAddrs, scheduler.EpvmScheduler, store.PersistentStore, cfg.DataDir)
 
 	managerApi := manager.Api{
 		Host:    cfg.Manager.Host,

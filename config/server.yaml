@@ -2,5 +2,6 @@ worker:
   host: localhost
   port: 5556
 manager:
-  host: localhost 
+  host: localhost
   port: 5555
+data_dir: ./data
