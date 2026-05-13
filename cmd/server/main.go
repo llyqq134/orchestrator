@@ -41,7 +41,7 @@ func main() {
 	for i := range workersCount {
 		w := &worker.Worker{
 			Queue: *queue.New(),
-			Db:    store.NewTaskStore(),
+			Db:    store.NewInMemoryTaskStore(),
 		}
 		workers[i] = w
 

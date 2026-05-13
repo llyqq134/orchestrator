@@ -66,8 +66,8 @@ func New(workers []string, schedulerType, dbType string) *Manager {
 
 	switch dbType {
 	case "memory":
-		ts = store.NewTaskStore()
-		es = store.NewTaskEventStore()
+		ts = store.NewInMemoryTaskStore()
+		es = store.NewInMemoryTaskEventStore()
 	}
 
 	m.TaskDb = ts

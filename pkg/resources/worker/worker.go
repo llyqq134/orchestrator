@@ -31,7 +31,7 @@ func New(name, taskDbType string) *Worker {
 	var s store.Store
 	switch taskDbType {
 	case "memory":
-		s = store.NewTaskStore()
+		s = store.NewInMemoryTaskStore()
 	}
 
 	w.Db = s

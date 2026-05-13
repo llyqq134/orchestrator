@@ -9,7 +9,7 @@ type InMemoryTaskStore struct {
 	Db map[string]*task.Task
 }
 
-func NewTaskStore() *InMemoryTaskStore {
+func NewInMemoryTaskStore() *InMemoryTaskStore {
 	return &InMemoryTaskStore{
 		Db: make(map[string]*task.Task),
 	}

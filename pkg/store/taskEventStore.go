@@ -9,7 +9,7 @@ type InMemoryTaskEventStore struct {
 	Db map[string]*task.Event
 }
 
-func NewTaskEventStore() *InMemoryTaskEventStore {
+func NewInMemoryTaskEventStore() *InMemoryTaskEventStore {
 	return &InMemoryTaskEventStore{
 		Db: make(map[string]*task.Event),
 	}
