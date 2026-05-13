@@ -121,7 +121,8 @@ func (a *Api) GetTaskByIdHandler(c *gin.Context) {
 		return
 	}
 
-	if _, ok := a.Worker.Db[taskId]; !ok {
+	task, err := a.Worker.Db.Get(taskId.String())
+	if err != nil {
 		log.Printf(op+"No task with id %v found\n", taskId)
 		c.JSON(404, gin.H{
 			"message": "Task wasn't found",
@@ -129,7 +130,7 @@ func (a *Api) GetTaskByIdHandler(c *gin.Context) {
 		return
 	}
 
-	c.JSON(200, a.Worker.Db[taskId])
+	c.JSON(200, task)
 }
 
 func (a *Api) StopTaskHandler(c *gin.Context) {
@@ -157,7 +158,8 @@ func (a *Api) StopTaskHandler(c *gin.Context) {
 		return
 	}
 
-	if _, ok := a.Worker.Db[taskId]; !ok {
+	task, err := a.Worker.Db.Get(taskId.String())
+	if err != nil {
 		log.Printf(op+"No task with id %v found\n", taskId)
 
 		c.JSON(404, gin.H{
@@ -167,12 +169,23 @@ func (a *Api) StopTaskHandler(c *gin.Context) {
 		return
 	}
 
-	taskToStop := a.Worker.Db[taskId]
-	taskCopy := *taskToStop
+	taskToStop, err := a.Worker.Db.Get(taskId.String())
+	if err != nil {
+		log.Printf(op+"Error getting task with id %v: %v\n", taskId, err)
+		c.JSON(500, gin.H{
+			"message": "Error getting task from database",
+			"error":   err.Error(),
+		})
+
+		return
+	}
+
+	taskCopy := taskToStop.(*task.Task)
+
 	task.StateCompleted(&taskCopy)
 	a.Worker.StopTask(taskCopy)
 
-	log.Printf(op+"Added task %v to stop container %v\n", taskToStop.UUID, taskToStop.ContainerID)
+	log.Printf(op+"Added task %v to stop container %v\n", taskCopy.UUID.String(), taskCopy.ContainerID)
 
 	c.JSON(204, gin.H{
 		"message": "task was deleted",
