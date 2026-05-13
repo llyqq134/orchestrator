@@ -158,7 +158,7 @@ func (a *Api) StopTaskHandler(c *gin.Context) {
 		return
 	}
 
-	task, err := a.Worker.Db.Get(taskId.String())
+	taskToStop, err := a.Worker.Db.Get(taskId.String())
 	if err != nil {
 		log.Printf(op+"No task with id %v found\n", taskId)
 
@@ -169,18 +169,7 @@ func (a *Api) StopTaskHandler(c *gin.Context) {
 		return
 	}
 
-	taskToStop, err := a.Worker.Db.Get(taskId.String())
-	if err != nil {
-		log.Printf(op+"Error getting task with id %v: %v\n", taskId, err)
-		c.JSON(500, gin.H{
-			"message": "Error getting task from database",
-			"error":   err.Error(),
-		})
-
-		return
-	}
-
-	taskCopy := taskToStop.(*task.Task)
+	taskCopy := *taskToStop.(*task.Task)
 
 	task.StateCompleted(&taskCopy)
 	a.Worker.StopTask(taskCopy)
