@@ -32,7 +32,7 @@ const (
 
 var stateTransitionMap = map[State][]State {
 	Pending: []State{Scheduled},
-	Scheduled: []State{Scheduled, Running, Failed},
+	Scheduled: []State{Scheduled, Running, Failed, Completed},
 	Running: []State{Running, Completed, Failed},
 	Completed: []State{},
 	Failed: []State{},
