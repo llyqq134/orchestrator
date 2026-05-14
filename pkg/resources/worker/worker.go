@@ -216,6 +216,7 @@ func (w *Worker) updateTasks() {
 				log.Printf(op+"No container for running task %s\n", id)
 				task.StateFailed(t)
 				w.Db.Put(t.UUID.String(), t)
+				continue
 			}
 
 			if resp.Container.State.Status == "exited" {

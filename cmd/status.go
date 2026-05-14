@@ -41,7 +41,7 @@ var statusCmd = &cobra.Command{
 		}
 
 		w := tabwriter.NewWriter(os.Stdout, 0, 0, 5, ' ', tabwriter.TabIndent)
-		fmt.Fprintln(w, "ID\tNAME\tCREATED\tSTATE\tCONTAINERNAME\tIMAGE\t")
+		fmt.Fprintln(w, "ID\tNAME\tCREATED\tSTATE\tIMAGE\tPORTS\t")
 
 		for _, task := range tasks {
 			var start string
@@ -51,7 +51,17 @@ var statusCmd = &cobra.Command{
 				start = fmt.Sprintf("%s ago", units.HumanDuration(time.Now().UTC().Sub(task.StartTime)))
 			}
 
-			fmt.Fprintf(w, "%s\t%s\t%s\t%d\t%s\t%s\t\n", task.UUID, task.Name, start, task.State, task.Name, task.Image)
+			var ports string
+			for port, bindings := range task.HostPorts {
+				for _, b := range bindings {
+					ports += fmt.Sprintf("%s→%s ", b.HostPort, port)
+				}
+			}
+			if ports == "" {
+				ports = "N/A"
+			}
+
+			fmt.Fprintf(w, "%s\t%s\t%s\t%d\t%s\t%s\t\n", task.UUID, task.Name, start, task.State, task.Image, ports)
 		}
 
 		w.Flush()
