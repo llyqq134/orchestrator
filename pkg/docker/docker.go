@@ -64,8 +64,8 @@ func (d *Docker) Run() Result {
 
 	hc := container.HostConfig {
 		RestartPolicy: rp,
-		Resources: r,
-		PublishAllPorts: true,
+		Resources:     r,
+		PortBindings:  d.Config.PortBindings,
 	}
 
 	resp, err := d.Client.ContainerCreate(ctx, &cc, &hc, nil, nil, d.Config.Name)

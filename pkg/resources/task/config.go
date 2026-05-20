@@ -8,6 +8,7 @@ type Config struct {
 	AttachStdout  bool
 	AttachStderr  bool
 	ExposedPorts  nat.PortSet
+	PortBindings  nat.PortMap
 	Cmd           []string
 	Image         string
 	CPU           float64
@@ -19,12 +20,13 @@ type Config struct {
 
 func NewConfig(t *Task) Config {
 	return Config {
-		Name: t.Name,
-		ExposedPorts: t.ExposedPorts,
-		Image: t.Image,
-		CPU: t.CPU,
-		Memory: int64(t.Memory),
-		Disk: int64(t.Disk),
+		Name:          t.Name,
+		ExposedPorts:  t.ExposedPorts,
+		PortBindings:  t.HostPorts,
+		Image:         t.Image,
+		CPU:           t.CPU,
+		Memory:        int64(t.Memory),
+		Disk:          int64(t.Disk),
 		RestartPolicy: t.RestartPolicy,
 	}	
 }
